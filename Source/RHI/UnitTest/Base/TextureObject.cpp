@@ -4,8 +4,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-TextureObject::TextureObject(rhi::DeviceRef pDevice, const uint8_t * dataInMemory, bool useStaging) 
-	: m_pDevice(pDevice), m_width(0), m_height(0), m_format(rhi::EPF_RGB8Unorm), m_pBits(nullptr), m_DataSize(0), m_UseStaging(useStaging)
+TextureObject::TextureObject(k3d::DeviceRef pDevice, const uint8_t * dataInMemory, bool useStaging) 
+	: m_pDevice(pDevice), m_width(0), m_height(0), m_format(k3d::EPF_RGB8Unorm), m_pBits(nullptr), m_DataSize(0), m_UseStaging(useStaging)
 {
 	InitData(dataInMemory);
 	if (!useStaging)
@@ -20,7 +20,7 @@ TextureObject::~TextureObject()
 	Destroy();
 }
 
-void TextureObject::MapIntoBuffer(rhi::GpuResourceRef stageBuff)
+void TextureObject::MapIntoBuffer(k3d::GpuResourceRef stageBuff)
 {
 	if (!m_UseStaging)
 		return;
@@ -29,35 +29,35 @@ void TextureObject::MapIntoBuffer(rhi::GpuResourceRef stageBuff)
 	stageBuff->UnMap();
 }
 
-void TextureObject::CopyAndInitTexture(rhi::GpuResourceRef stageBuff)
+void TextureObject::CopyAndInitTexture(k3d::GpuResourceRef stageBuff)
 {
 	if (!m_UseStaging)
 		return;
-	rhi::ResourceDesc texDesc;
-	texDesc.Type = rhi::EGT_Texture2D;
-	texDesc.ViewType = rhi::EGpuMemViewType::EGVT_SRV;
-	texDesc.CreationFlag = rhi::EGpuResourceCreationFlag::EGRCF_TransferDst;
-	texDesc.Flag = rhi::EGpuResourceAccessFlag::EGRAF_DeviceVisible;
-	texDesc.TextureDesc.Format = rhi::EPF_RGBA8Unorm;
+	k3d::ResourceDesc texDesc;
+	texDesc.Type = k3d::EGT_Texture2D;
+	texDesc.ViewType = k3d::EGpuMemViewType::EGVT_SRV;
+	texDesc.CreationFlag = k3d::EGpuResourceCreationFlag::EGRCF_TransferDst;
+	texDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_DeviceVisible;
+	texDesc.TextureDesc.Format = k3d::EPF_RGBA8Unorm;
 	texDesc.TextureDesc.Width = m_width;
 	texDesc.TextureDesc.Height = m_height;
 	texDesc.TextureDesc.Layers = 1;
 	texDesc.TextureDesc.MipLevels = 1;
 	texDesc.TextureDesc.Depth = 1;
 	m_Resource = m_pDevice->NewGpuResource(texDesc);
-  auto pQueue = m_pDevice->CreateCommandQueue(rhi::ECMD_Graphics);
-  auto cmdBuf = pQueue->ObtainCommandBuffer(rhi::ECMDUsage_OneShot);
-  cmdBuf->Transition(m_Resource, rhi::ERS_TransferDst);
-  rhi::TextureCopyLocation copyDest(m_Resource, ::k3d::DynArray<uint32>());
-  auto footprints = ::k3d::DynArray<rhi::PlacedSubResourceFootprint>();
-  rhi::PlacedSubResourceFootprint fp;
+  auto pQueue = m_pDevice->CreateCommandQueue(k3d::ECMD_Graphics);
+  auto cmdBuf = pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
+  cmdBuf->Transition(m_Resource, k3d::ERS_TransferDst);
+  k3d::TextureCopyLocation copyDest(m_Resource, ::k3d::DynArray<uint32>());
+  auto footprints = ::k3d::DynArray<k3d::PlacedSubResourceFootprint>();
+  k3d::PlacedSubResourceFootprint fp;
   fp.BufferOffSet = 0; fp.TOffSetX = 0; fp.TOffSetY = 0; fp.TOffSetZ = 0;
   fp.Footprint.Dimension = texDesc.TextureDesc;
   fp.Footprint.SubLayout = {};
   footprints.Append(fp);
-  rhi::TextureCopyLocation copySrc(stageBuff, footprints);
+  k3d::TextureCopyLocation copySrc(stageBuff, footprints);
   cmdBuf->CopyTexture(copyDest, copySrc);
-  cmdBuf->Transition(m_Resource, rhi::ERS_ShaderResource);
+  cmdBuf->Transition(m_Resource, k3d::ERS_ShaderResource);
   cmdBuf->Commit();
 }
 
@@ -79,7 +79,7 @@ void TextureObject::InitData(const uint8* dataInMemory)
 	uint8_t nPixelSize = header.PixelDepth / 8;
 	m_width = header.ImageWidth;
 	m_height = header.ImageHeight;
-	m_format = nPixelSize == 3 ? rhi::EPF_RGBA8Unorm : rhi::EPF_RGBA8Unorm;
+	m_format = nPixelSize == 3 ? k3d::EPF_RGBA8Unorm : k3d::EPF_RGBA8Unorm;
 	dataInMemory += sizeof(TARGA_HEADER);
 	m_pBits = new uint8_t[nPixelSize * header.ImageWidth * header.ImageHeight];
 	memcpy(m_pBits, dataInMemory, nPixelSize * header.ImageWidth * header.ImageHeight);
@@ -99,11 +99,11 @@ void TextureObject::InitData(const uint8* dataInMemory)
 
 void TextureObject::InitTexture()
 {
-	rhi::ResourceDesc texDesc;
-	texDesc.Type = rhi::EGT_Texture2D;
-	texDesc.ViewType = rhi::EGpuMemViewType::EGVT_SRV;
-	texDesc.Flag = rhi::EGpuResourceAccessFlag::EGRAF_HostVisible;
-	texDesc.TextureDesc.Format = rhi::EPF_RGBA8Unorm;
+	k3d::ResourceDesc texDesc;
+	texDesc.Type = k3d::EGT_Texture2D;
+	texDesc.ViewType = k3d::EGpuMemViewType::EGVT_SRV;
+	texDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
+	texDesc.TextureDesc.Format = k3d::EPF_RGBA8Unorm;
 	texDesc.TextureDesc.Width = m_width;
 	texDesc.TextureDesc.Height = m_height;
 	texDesc.TextureDesc.Layers = 1;
@@ -113,9 +113,9 @@ void TextureObject::InitTexture()
 
 	uint64 sz = m_Resource->GetSize();
 	void * pData = m_Resource->Map(0, sz);
-	rhi::SubResourceLayout layout = {};
-	rhi::TextureResourceSpec spec = { rhi::ETAF_COLOR,0,0 };
-	m_pDevice->QueryTextureSubResourceLayout(k3d::StaticPointerCast<rhi::ITexture>(m_Resource), spec, &layout);
+	k3d::SubResourceLayout layout = {};
+	k3d::TextureResourceSpec spec = { k3d::ETAF_COLOR,0,0 };
+	m_pDevice->QueryTextureSubResourceLayout(k3d::StaticPointerCast<k3d::ITexture>(m_Resource), spec, &layout);
 	if (m_width * 4 == layout.RowPitch) // directly upload
 	{
 		memcpy(pData, m_pBits, sz);
@@ -133,9 +133,9 @@ void TextureObject::InitTexture()
 	}
 	m_Resource->UnMap();
 #if 0
-	m_pContext = m_pDevice->NewCommandContext(rhi::ECMD_Graphics);
+	m_pContext = m_pDevice->NewCommandContext(k3d::ECMD_Graphics);
 	m_pContext->Begin();
-	m_pContext->TransitionResourceBarrier(m_Resource, rhi::ERS_ShaderResource);
+	m_pContext->TransitionResourceBarrier(m_Resource, k3d::ERS_ShaderResource);
 	m_pContext->End();
 	m_pContext->Execute(false);
 #endif
