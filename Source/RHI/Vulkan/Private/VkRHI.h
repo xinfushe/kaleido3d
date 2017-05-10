@@ -1122,6 +1122,8 @@ public:
               VkFence fence,
               const std::vector<VkSemaphore>& signalSemaphores);
 
+  SpCmdBuffer ObtainSecondaryCommandBuffer();
+
   VkResult Submit(const std::vector<VkSubmitInfo>& submits, VkFence fence);
 
   void Present(SpSwapChain& pSwapChain);
@@ -1141,6 +1143,7 @@ private:
 
   CmdBufManagerRef m_TransientCmdBufferPool;
   CmdBufManagerRef m_ReUsableCmdBufferPool;
+  CmdBufManagerRef m_SecondaryCmdBufferPool;
 };
 
 class CommandBuffer
@@ -1275,7 +1278,6 @@ public:
   friend class ParallelCommandEncoder;
   template<typename T>
   friend class k3d::TRefCountInstance;
-
 protected:
   RenderCommandEncoder(SpCmdBuffer pCmd, ECmdLevel Level);
   RenderCommandEncoder(SpParallelCmdEncoder ParentEncoder, SpCmdBuffer pCmd);
@@ -1302,10 +1304,10 @@ public:
 
 class ParallelCommandEncoder
   : public CommandEncoder<k3d::IParallelRenderCommandEncoder>
-  , EnableSharedFromThis<ParallelCommandEncoder>
+  , public EnableSharedFromThis<ParallelCommandEncoder>
 {
 public:
-  using This = CommandEncoder<k3d::IParallelRenderCommandEncoder>;
+  using Super = CommandEncoder<k3d::IParallelRenderCommandEncoder>;
   k3d::RenderCommandEncoderRef SubRenderCommandEncoder() override;
   void EndEncode() override;
   VkPipelineBindPoint GetBindPoint() const override
@@ -1315,8 +1317,9 @@ public:
   friend class CommandBuffer;
   template<typename T>
   friend class k3d::TRefCountInstance;
-
 private:
+  ParallelCommandEncoder(SpCmdBuffer PrimaryCmdBuffer);
+  void SubAllocateSecondaryCmd();
   bool m_RenderpassBegun = false;
   DynArray<SpRenderCommandEncoder> m_RecordedCmds;
 };

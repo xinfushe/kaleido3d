@@ -187,6 +187,14 @@ CommandQueue::Submit(const std::vector<VkCommandBuffer>& cmdBufs,
   this->Submit({ submits }, fence);
 }
 
+SpCmdBuffer
+CommandQueue::ObtainSecondaryCommandBuffer()
+{
+  VkCommandBuffer Cmd = m_SecondaryCmdBufferPool->RequestCommandBuffer();
+  //m_SecondaryCmdBufferPool->BeginFrame();
+  return MakeShared<CommandBuffer>(m_Device, SharedFromThis(), Cmd);
+}
+
 VkResult
 CommandQueue::Submit(const std::vector<VkSubmitInfo>& submits, VkFence fence)
 {
@@ -236,6 +244,8 @@ CommandQueue::Initialize(VkQueueFlags queueTypes,
     m_Device->GetRawDevice(), m_QueueFamilyIndex, m_QueueIndex, &m_NativeObj);
   m_ReUsableCmdBufferPool = MakeShared<CommandBufferManager>(
     m_Device->GetRawDevice(), VK_COMMAND_BUFFER_LEVEL_PRIMARY, m_QueueIndex);
+  m_SecondaryCmdBufferPool = MakeShared<CommandBufferManager>(
+    m_Device->GetRawDevice(), VK_COMMAND_BUFFER_LEVEL_SECONDARY, m_QueueIndex);
 }
 
 void
@@ -352,7 +362,10 @@ CommandBuffer::ComputeCommandEncoder(k3d::ComputePipelineStateRef)
 k3d::ParallelRenderCommandEncoderRef
 CommandBuffer::ParallelRenderCommandEncoder(k3d::RenderPassDesc const& Desc)
 {
-  return k3d::ParallelRenderCommandEncoderRef();
+  auto pRenderpass = StaticPointerCast<RenderPass>(m_Device->CreateRenderPass(Desc));
+  auto pFramebuffer = m_Device->GetOrCreateFramebuffer(Desc);
+  pRenderpass->Begin(m_NativeObj, pFramebuffer, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS); // next append secondary cmds
+  return MakeShared<vk::ParallelCommandEncoder>(SharedFromThis());
 }
 
 void
@@ -648,23 +661,19 @@ ComputeCommandEncoder::Dispatch(uint32 GroupCountX,
 k3d::RenderCommandEncoderRef
 ParallelCommandEncoder::SubRenderCommandEncoder()
 {
-  if (!m_RenderpassBegun) {
-    VkRenderPassBeginInfo renderPassBeginInfo = {
-      VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO
-    };
-    /*renderPassBeginInfo.renderPass = pRT->GetRenderpass();
-    renderPassBeginInfo.renderArea = pRT->GetRenderArea();*/
-    // renderPassBeginInfo.pClearValues = pRT->m_ClearValues;
-    renderPassBeginInfo.clearValueCount = 2;
-    // renderPassBeginInfo.framebuffer = pRT->GetFramebuffer();
-    vkCmdBeginRenderPass(m_MasterCmd->NativeHandle(),
-                         &renderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-    m_RenderpassBegun = true;
-  }
+  VkCommandBufferInheritanceInfo inheritanceInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
+  VkCommandBufferBeginInfo commandBufferBeginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+  commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+  commandBufferBeginInfo.pInheritanceInfo = &inheritanceInfo;
   // allocate secondary cmd
+  auto CmdBuffer = m_pQueue->ObtainSecondaryCommandBuffer();
+  K3D_VK_VERIFY(vkBeginCommandBuffer(CmdBuffer->NativeHandle(), &commandBufferBeginInfo));
+  return MakeShared<RenderCommandEncoder>(SharedFromThis(), CmdBuffer);
+}
 
-  return nullptr;
+ParallelCommandEncoder::ParallelCommandEncoder(SpCmdBuffer pCmd)
+  : Super(pCmd)
+{
 }
 
 void
@@ -681,7 +690,11 @@ ParallelCommandEncoder::EndEncode()
     vkCmdEndRenderPass(m_MasterCmd->NativeHandle());
   }
 
-  This::EndEncode();
+  Super::EndEncode();
+}
+
+void ParallelCommandEncoder::SubAllocateSecondaryCmd()
+{
 }
 
 RenderTarget::RenderTarget(Device::Ptr pDevice,

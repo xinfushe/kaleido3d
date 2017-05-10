@@ -37,10 +37,10 @@ add_unittest(
 #	5.ComputeParticles.cpp
 #)
 
-#add_unittest(
-#	RHI-UnitTest-6.MultiThreadRendering
-#	6.MultiThreadRendering.cpp
-#)
+add_unittest(
+	RHI-UnitTest-6.MultiThreadRendering
+	6.MultiThreadRendering.cpp
+)
 
 #add_unittest(
 #	RHI-UnitTest-7.MultipleRenderTargets

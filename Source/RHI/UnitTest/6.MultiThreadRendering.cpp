@@ -46,17 +46,15 @@ protected:
   void PrepareCommandBuffer();
 
 private:
-  rhi::IShCompiler::Ptr m_Compiler;
+  IShCompiler::Ptr m_Compiler;
   std::unique_ptr<TriangleMesh> m_TriMesh;
 
-  rhi::GpuResourceRef m_ConstBuffer;
+  GpuResourceRef m_ConstBuffer;
   ConstantBuffer m_HostBuffer;
 
-  rhi::PipelineStateRef m_pPso;
-  rhi::PipelineLayoutRef m_pl;
-  std::vector<rhi::CommandContextRef> m_Cmds;
-  rhi::SyncFenceRef m_pFence;
-  rhi::CommandQueueRef m_pQueue;
+  k3d::PipelineStateRef m_pPso;
+  k3d::PipelineLayoutRef m_pl;
+  k3d::SyncFenceRef m_pFence;
 };
 
 K3D_APP_MAIN(MultiThreadRenderingApp)
@@ -72,7 +70,7 @@ public:
   typedef std::vector<Vertex> VertexList;
   typedef std::vector<uint32> IndiceList;
 
-  explicit TriangleMesh(rhi::DeviceRef device)
+  explicit TriangleMesh(k3d::DeviceRef device)
     : m_pDevice(device)
     , vbuf(nullptr)
     , ibuf(nullptr)
@@ -80,15 +78,15 @@ public:
     m_szVBuf = sizeof(TriangleMesh::Vertex) * m_VertexBuffer.size();
     m_szIBuf = sizeof(uint32) * m_IndexBuffer.size();
 
-    m_IAState.Attribs[0] = { rhi::EVF_Float3x32, 0, 0 };
-    m_IAState.Attribs[1] = { rhi::EVF_Float3x32, sizeof(float) * 3, 0 };
+    m_IAState.Attribs[0] = { k3d::EVF_Float3x32, 0, 0 };
+    m_IAState.Attribs[1] = { k3d::EVF_Float3x32, sizeof(float) * 3, 0 };
 
-    m_IAState.Layouts[0] = { rhi::EVIR_PerVertex, sizeof(Vertex) };
+    m_IAState.Layouts[0] = { k3d::EVIR_PerVertex, sizeof(Vertex) };
   }
 
   ~TriangleMesh() {}
 
-  const rhi::VertexInputState& GetInputState() const { return m_IAState; }
+  const k3d::VertexInputState& GetInputState() const { return m_IAState; }
 
   void Upload();
 
@@ -98,18 +96,18 @@ public:
     vboLoc = vbo;
   }
 
-  const rhi::VertexBufferView VBO() const
+  const k3d::VertexBufferView VBO() const
   {
-    return rhi::VertexBufferView{ vboLoc, 0, 0 };
+    return k3d::VertexBufferView{ vboLoc, 0, 0 };
   }
 
-  const rhi::IndexBufferView IBO() const
+  const k3d::IndexBufferView IBO() const
   {
-    return rhi::IndexBufferView{ iboLoc, 0 };
+    return k3d::IndexBufferView{ iboLoc, 0 };
   }
 
 private:
-  rhi::VertexInputState m_IAState;
+  k3d::VertexInputState m_IAState;
 
   uint64 m_szVBuf;
   uint64 m_szIBuf;
@@ -123,19 +121,19 @@ private:
   uint64 iboLoc;
   uint64 vboLoc;
 
-  rhi::DeviceRef m_pDevice;
-  rhi::GpuResourceRef vbuf, ibuf;
+  k3d::DeviceRef m_pDevice;
+  k3d::GpuResourceRef vbuf, ibuf;
 };
 
 void
 TriangleMesh::Upload()
 {
   // create stage buffers
-  rhi::ResourceDesc stageDesc;
-  stageDesc.ViewType = rhi::EGpuMemViewType::EGVT_Undefined;
-  stageDesc.CreationFlag = rhi::EGpuResourceCreationFlag::EGRCF_TransferSrc;
-  stageDesc.Flag = rhi::EGpuResourceAccessFlag::EGRAF_HostCoherent |
-    rhi::EGpuResourceAccessFlag::EGRAF_HostVisible;
+  k3d::ResourceDesc stageDesc;
+  stageDesc.ViewType = k3d::EGpuMemViewType::EGVT_Undefined;
+  stageDesc.CreationFlag = k3d::EGpuResourceCreationFlag::EGRCF_TransferSrc;
+  stageDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostCoherent |
+    k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
   stageDesc.Size = m_szVBuf;
   auto vStageBuf = m_pDevice->NewGpuResource(stageDesc);
   void* ptr = vStageBuf->Map(0, m_szVBuf);
@@ -148,18 +146,18 @@ TriangleMesh::Upload()
   memcpy(ptr, &m_IndexBuffer[0], m_szIBuf);
   iStageBuf->UnMap();
 
-  rhi::ResourceDesc bufferDesc;
-  bufferDesc.ViewType = rhi::EGpuMemViewType::EGVT_VBV;
+  k3d::ResourceDesc bufferDesc;
+  bufferDesc.ViewType = k3d::EGpuMemViewType::EGVT_VBV;
   bufferDesc.Size = m_szVBuf;
-  bufferDesc.CreationFlag = rhi::EGpuResourceCreationFlag::EGRCF_TransferDst;
-  bufferDesc.Flag = rhi::EGpuResourceAccessFlag::EGRAF_DeviceVisible;
+  bufferDesc.CreationFlag = k3d::EGpuResourceCreationFlag::EGRCF_TransferDst;
+  bufferDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_DeviceVisible;
   vbuf = m_pDevice->NewGpuResource(bufferDesc);
-  bufferDesc.ViewType = rhi::EGpuMemViewType::EGVT_IBV;
+  bufferDesc.ViewType = k3d::EGpuMemViewType::EGVT_IBV;
   bufferDesc.Size = m_szIBuf;
   ibuf = m_pDevice->NewGpuResource(bufferDesc);
 #if 0
-  auto cmd = m_pQueue->ObtainCommandBuffer(rhi::ECMD_Graphics);
-  rhi::CopyBufferRegion region = { 0, 0, m_szVBuf };
+  auto cmd = m_pQueue->ObtainCommandBuffer(k3d::ECMD_Graphics);
+  k3d::CopyBufferRegion region = { 0, 0, m_szVBuf };
   cmd->Begin();
   cmd->CopyBuffer(*vbuf, *vStageBuf, region);
   region.CopySize = m_szIBuf;
@@ -197,9 +195,9 @@ MultiThreadRenderingApp::PrepareResource()
   m_TriMesh = std::make_unique<TriangleMesh>(m_pDevice);
   m_TriMesh->Upload();
 
-  rhi::ResourceDesc desc;
-  desc.Flag = rhi::EGpuResourceAccessFlag::EGRAF_HostVisible;
-  desc.ViewType = rhi::EGpuMemViewType::EGVT_CBV;
+  k3d::ResourceDesc desc;
+  desc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
+  desc.ViewType = k3d::EGpuMemViewType::EGVT_CBV;
   desc.Size = sizeof(ConstantBuffer);
   m_ConstBuffer = m_pDevice->NewGpuResource(desc);
   OnUpdate();
@@ -209,21 +207,34 @@ MultiThreadRenderingApp::PrepareResource()
 void
 MultiThreadRenderingApp::PreparePipeline()
 {
-  rhi::ShaderBundle vertSh, fragSh;
-  Compile("asset://Test/triangle.vert", rhi::ES_Vertex, vertSh);
-  Compile("asset://Test/triangle.frag", rhi::ES_Fragment, fragSh);
-  rhi::PipelineLayoutDesc ppldesc = vertSh.BindingTable;
+  k3d::ShaderBundle vertSh, fragSh;
+  Compile("asset://Test/triangle.vert", k3d::ES_Vertex, vertSh);
+  Compile("asset://Test/triangle.frag", k3d::ES_Fragment, fragSh);
+  k3d::PipelineLayoutDesc ppldesc = vertSh.BindingTable;
   m_pl = m_pDevice->NewPipelineLayout(ppldesc);
   if (m_pl) {
     auto descriptor = m_pl->GetDescriptorSet();
     descriptor->Update(0, m_ConstBuffer);
   }
   auto attrib = vertSh.Attributes;
-  rhi::RenderPipelineStateDesc desc;
+
+  k3d::RenderPipelineStateDesc desc;
+  desc.AttachmentsBlend.Append(AttachmentState());
   desc.VertexShader = vertSh;
   desc.PixelShader = fragSh;
   desc.InputState = m_TriMesh->GetInputState();
-  m_pPso = m_pDevice->CreateRenderPipelineState(desc, m_pl);
+
+  k3d::ColorAttachmentDesc ColorAttach;
+  ColorAttach.pTexture = m_pSwapChain->GetCurrentTexture();
+  ColorAttach.LoadAction = k3d::ELA_Clear;
+  ColorAttach.StoreAction = k3d::ESA_Store;
+  ColorAttach.ClearColor = Vec4f(1, 1, 1, 1);
+
+  k3d::RenderPassDesc Desc;
+  Desc.ColorAttachments.Append(ColorAttach);
+  auto pRenderPass = m_pDevice->CreateRenderPass(Desc);
+
+  m_pPso = m_pDevice->CreateRenderPipelineState(desc, m_pl, pRenderPass);
 }
 
 void
@@ -243,21 +254,27 @@ void
 MultiThreadRenderingApp::OnProcess(Message& msg)
 {
   auto currentImage = m_pSwapChain->GetCurrentTexture();
-  auto commandBuffer = m_pQueue->ObtainCommandBuffer(rhi::ECMDUsage_OneShot);
-  commandBuffer->Transition(currentImage, rhi::ERS_RenderTarget);
+  auto commandBuffer = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
   // command encoder like Metal does
-  auto parallelRenderCmd = commandBuffer->ParallelRenderCommandEncoder(nullptr, nullptr);
+  k3d::ColorAttachmentDesc ColorAttach;
+  ColorAttach.pTexture = m_pSwapChain->GetCurrentTexture();
+  ColorAttach.LoadAction = k3d::ELA_Clear;
+  ColorAttach.StoreAction = k3d::ESA_Store;
+  ColorAttach.ClearColor = Vec4f(1, 1, 1, 1);
+  k3d::RenderPassDesc Desc;
+  Desc.ColorAttachments.Append(ColorAttach);
+  auto parallelRenderCmd = commandBuffer->ParallelRenderCommandEncoder(Desc);
   DynArray<SharedPtr<Os::Thread>> threadPool;
   threadPool.Append(MakeShared<Os::Thread>([=]() {
     auto subRenderCmd = parallelRenderCmd->SubRenderCommandEncoder();
     subRenderCmd->SetPipelineLayout(m_pl);
-    rhi::Rect rect{ 0,0,1920,1080 };
+    k3d::Rect rect{ 0,0,1920,1080 };
     subRenderCmd->SetScissorRect(rect);
-    subRenderCmd->SetViewport(rhi::ViewportDesc(1920, 1080));
+    subRenderCmd->SetViewport(k3d::ViewportDesc(1920, 1080));
     subRenderCmd->SetPipelineState(0, m_pPso);
     subRenderCmd->SetIndexBuffer(m_TriMesh->IBO());
     subRenderCmd->SetVertexBuffer(0, m_TriMesh->VBO());
-    subRenderCmd->DrawIndexedInstanced(rhi::DrawIndexedInstancedParam(3, 1));
+    subRenderCmd->DrawIndexedInstanced(k3d::DrawIndexedInstancedParam(3, 1));
     subRenderCmd->EndEncode(); // push into parallel command encoder
   }, "SubRenderThread"));
   for (auto subRenderThread : threadPool)
@@ -270,8 +287,6 @@ MultiThreadRenderingApp::OnProcess(Message& msg)
   }
   // execute all sub commands
   parallelRenderCmd->EndEncode();
-
-  commandBuffer->Transition(currentImage, rhi::ERS_Present);
   commandBuffer->Present(m_pSwapChain, m_pFence);
   commandBuffer->Commit(); // submit
 }
