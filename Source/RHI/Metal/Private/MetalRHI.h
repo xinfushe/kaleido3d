@@ -14,23 +14,16 @@
 
 NS_K3D_METAL_BEGIN
 
-class DeviceAdapter : public rhi::IDeviceAdapter
+class Device;
+using SpDevice = SharedPtr<Device>;
+
+class Factory : public k3d::IFactory
 {
-    friend class Device;
 public:
-    DeviceAdapter(id<MTLDevice> device)
-    : m_Device(device), m_pRHIDevice(nullptr) {}
     
-    id<MTLDevice> GetDevice() const { return m_Device; }
-    
-    rhi::DeviceRef GetDevice() override;
-private:
-    
-    rhi::DeviceRef  m_pRHIDevice;
-    id<MTLDevice>   m_Device;
 };
 
-class Device : public rhi::IDevice
+class Device : public k3d::IDevice, public EnableSharedFromThis<Device>
 {
 public:
     id<MTLDevice> GetDevice();
@@ -39,78 +32,142 @@ public:
     Device();
     ~Device() override;
     
-    Result                      Create(rhi::IDeviceAdapter *, bool withDebug) override;
-    rhi::CommandContextRef      NewCommandContext(rhi::ECommandType) override;
-    rhi::GpuResourceRef          NewGpuResource(rhi::ResourceDesc const&)override;
-    rhi::ShaderResourceViewRef	NewShaderResourceView(rhi::GpuResourceRef, rhi::ResourceViewDesc const&)override;
-    rhi::SamplerRef              NewSampler(const rhi::SamplerState&)override;
-    rhi::PipelineStateObjectRef	NewPipelineState(rhi::PipelineDesc const&,rhi::PipelineLayoutRef,rhi::EPipelineType)override;
-    rhi::PipelineLayoutRef		NewPipelineLayout(rhi::PipelineLayoutDesc const & table) override;
-    rhi::SyncFenceRef            NewFence()override;
-    rhi::IDescriptorPool*		NewDescriptorPool()override;
-    rhi::RenderViewportRef		NewRenderViewport(void * winHandle, rhi::GfxSetting &)override;
-    rhi::RenderTargetRef		NewRenderTarget(rhi::RenderTargetLayout const&)override;
-
-    void Destroy();
+    void Release() override;
     
+    k3d::GpuResourceRef          NewGpuResource(k3d::ResourceDesc const&)override;
+    k3d::ShaderResourceViewRef	NewShaderResourceView(k3d::GpuResourceRef, k3d::ResourceViewDesc const&)override;
+    k3d::SamplerRef              NewSampler(const k3d::SamplerState&)override;
+    
+    k3d::PipelineLayoutRef		NewPipelineLayout(k3d::PipelineLayoutDesc const & table) override;
+    k3d::SyncFenceRef           CreateFence()override;
+
+    
+    friend struct DeviceChild;
 private:
     Device(id<MTLDevice> device);
-    friend class DeviceAdapter;
     
     id <MTLDevice>          m_Device;
     id <MTLCommandQueue>    m_CommandQueue;
     MTLFeatureSet           m_FeatureSet;
 };
 
-//// Create RHI MetalDevice /////
-inline rhi::DeviceRef DeviceAdapter::GetDevice()
+class CommandQueue : public k3d::ICommandQueue
 {
-    if(!m_pRHIDevice)
-    {
-        auto pDevice = new Device(m_Device);
-        pDevice->Create(this, false);
-        m_pRHIDevice = rhi::DeviceRef(pDevice);
-    }
-    return m_pRHIDevice;
-}
-//////////////////////////////////
+    
+};
 
-class PipelineState : public rhi::IPipelineStateObject
+class CommandBuffer : public k3d::ICommandBuffer
+{
+    
+};
+
+class CommandEncoder : public k3d::ICommandEncoder
+{
+    
+};
+
+template <typename RHIInterface>
+struct MTLObj
+{
+};
+
+template<>
+struct MTLObj<k3d::IRenderPipelineState>
+{
+    typedef id<MTLRenderPipelineState> RawType;
+    typedef MTLRenderPipelineDescriptor Desc;
+};
+
+template<>
+struct MTLObj<k3d::IComputePipelineState>
+{
+    typedef id<MTLComputePipelineState> RawType;
+    typedef MTLComputePipelineDescriptor Desc;
+};
+
+struct DeviceChild
+{
+    DeviceChild(SpDevice pDevice)
+    : Device(pDevice)
+    {
+    }
+    
+    id<MTLDevice> NativeDevice() const
+    {
+        return Device->m_Device;
+    }
+    
+    id<MTLCommandQueue> NativeQueue() const
+    {
+        return Device->m_CommandQueue;
+    }
+    
+    SpDevice Device;
+};
+
+template <typename T>
+struct TPipelineType
+{
+    static const EPipelineType Type = EPSO_Graphics;
+};
+
+template <>
+struct TPipelineType<k3d::IRenderPipelineState>
+{
+    static const EPipelineType Type = EPSO_Graphics;
+};
+
+template <>
+struct TPipelineType<k3d::IComputePipelineState>
+{
+    static const EPipelineType Type = EPSO_Compute;
+};
+
+template <typename T>
+class TPipeline : public T, public DeviceChild
 {
     friend class Device;
-    friend class CommandContext;
-public:
-    PipelineState(id<MTLDevice> pDevice, rhi::PipelineDesc const & desc, rhi::EPipelineType const& type);
-    ~PipelineState();
-
-    rhi::EPipelineType GetType () override { return m_Type; }
+protected:
+    typename MTLObj<T>::RawType m_NativeObj;
+    typename MTLObj<T>::Desc* m_NativeDesc;
     
-    void SetLayout(rhi::PipelineLayoutRef) override;
-    void SetShader(rhi::EShaderType, rhi::ShaderBundle const&) override;
-    void SetRasterizerState(const rhi::RasterizerState&) override;
-    void SetBlendState(const rhi::BlendState&) override;
-    void SetDepthStencilState(const rhi::DepthStencilState&) override;
-    void SetPrimitiveTopology(const rhi::EPrimitiveType) override;
-    void SetVertexInputLayout(rhi::VertexDeclaration const*, uint32 Count) override;
-    void SetRenderTargetFormat(const rhi::RenderTargetFormat &) override;
-    void SetSampler(rhi::SamplerRef)override;
+public:
+    
+    explicit TPipeline(SpDevice pDevice) : DeviceChild(pDevice)
+    {}
+    
+    virtual ~TPipeline() override
+    {}
+    
+    EPipelineType GetType() const override
+    { return TPipelineType<T>::Type; };
+    
+    //virtual void Rebuild() = 0;
+};
 
-    void Finalize() override;
+class RenderPipeline : public TPipeline<k3d::IRenderPipelineState>
+{
+    using Super = TPipeline<k3d::IRenderPipelineState>;
+public:
+    
+    RenderPipeline(SpDevice pDevice, k3d::RenderPipelineStateDesc const & desc);
+    ~RenderPipeline() override;
+
+    void SetRasterizerState(const k3d::RasterizerState&) override;
+    void SetBlendState(const k3d::BlendState&) override;
+    void SetDepthStencilState(const k3d::DepthStencilState&) override;
+    void SetPrimitiveTopology(const k3d::EPrimitiveType) override;
+    void SetRenderTargetFormat(const k3d::RenderTargetFormat &) override;
+    void SetSampler(k3d::SamplerRef)override;
+
+    void Rebuild() override;
     
 private:
-    void InitPSO(rhi::PipelineDesc const & desc);
-    void AssignShader(rhi::ShaderBundle const& shaderBundle);
-    
-    rhi::EPipelineType              m_Type;
-    id<MTLDevice>                   m_Device;
-    
-    id<MTLComputePipelineState>     m_ComputePipelineState;
-    MTLComputePipelineDescriptor*   m_ComputePipelineDesc;
-    
-    id<MTLRenderPipelineState>      m_RenderPipelineState;
-    MTLRenderPipelineDescriptor*    m_RenderPipelineDesc;
+    void InitPSO(k3d::RenderPipelineStateDesc const & desc);
+    void AssignShader(k3d::ShaderBundle const& shaderBundle);
     
     MTLDepthStencilDescriptor*      m_DepthStencilDesc;
+    id<MTLDepthStencilState>        m_DepthStencilState;
     MTLCullMode                     m_CullMode;
     float                           m_DepthBias;
     float                           m_DepthBiasClamp;
@@ -118,73 +175,154 @@ private:
     MTLPrimitiveType                m_PrimitiveType;
     
     MTLRenderPipelineReflection*    m_RenderReflection;
-    MTLComputePipelineReflection*   m_ComputeReflection;
-    
-    id<MTLDepthStencilState>        m_DepthStencilState;
+    //MTLComputePipelineReflection*   m_ComputeReflection;
 };
 
-class DescriptorSet : public rhi::IDescriptor
+class DescriptorSet : public k3d::IDescriptor
 {
 public:
     DescriptorSet()
     {}
     
-    void Update(uint32 bindSet, rhi::GpuResourceRef res) override;
+    void Update(uint32 bindSet, k3d::GpuResourceRef res) override;
     
 private:
     
 };
 
-class PipelineLayout : public rhi::IPipelineLayout
+class PipelineLayout : public k3d::IPipelineLayout
 {
 public:
-    PipelineLayout(rhi::PipelineLayoutDesc const&);
+    PipelineLayout(k3d::PipelineLayoutDesc const&);
     ~PipelineLayout();
     
-    rhi::DescriptorRef GetDescriptorSet() const override;
+    k3d::DescriptorRef GetDescriptorSet() const override;
     
 private:
     
 };
 
-class CommandContext : public rhi::ICommandContext
+class BufferRef
 {
 public:
-    CommandContext(rhi::ECommandType const & cmdType, id<MTLCommandBuffer> cmdBuf);
+    BufferRef(id<MTLBuffer> iBuf)
+    : m_InterCnt(0)
+    , m_ExtCnt(0)
+    {
+        m_iBuffer = iBuf;
+    }
+    
+    ~BufferRef()
+    {
+    }
+    
+    void Retain()
+    {
+        
+    }
+    
+    void Release()
+    {
+        
+    }
+    
+private:
+    id<MTLBuffer> m_iBuffer;
+    int m_InterCnt;
+    int m_ExtCnt;
+};
+
+class Buffer : public k3d::IGpuResource
+{
+public:
+    Buffer(Device* device, k3d::ResourceDesc const & desc);
+    ~Buffer();
+    
+    void *                      Map(uint64 start, uint64 size) override;
+    void                        UnMap() override;
+    
+    uint64                      GetLocation() const override;
+    k3d::ResourceDesc           GetDesc() const override;
+    k3d::EResourceState         GetState() const override;
+    //    k3d::EGpuResourceType       GetType() const	override;
+    uint64                      GetSize() const override;
+    
+private:
+    NSRange             m_MapRange;
+    id<MTLBuffer>       m_Buf;
+    
+    k3d::ResourceDesc   m_Desc;
+    Device*             m_Device;
+};
+
+class Texture : public k3d::ITexture
+{
+public:
+    Texture(Device* device, k3d::ResourceDesc const & desc);
+    ~Texture();
+    
+    void *                      Map(uint64 start, uint64 size) override;
+    void                        UnMap() override;
+    
+    uint64                      GetLocation() const override;
+    k3d::ResourceDesc           GetDesc() const override;
+    k3d::EResourceState         GetState() const override { return k3d::ERS_Unknown; }
+    //    k3d::EGpuResourceType       GetResourceType() const	override { return k3d::ResourceTypeNum; }
+    uint64                      GetSize() const override;
+    
+    k3d::SamplerCRef			GetSampler() const override;
+    void                        BindSampler(k3d::SamplerRef) override;
+    void                        SetResourceView(k3d::ShaderResourceViewRef) override;
+    k3d::ShaderResourceViewRef 	GetResourceView() const override;
+    
+private:
+    id<MTLTexture>          m_Tex;
+    MTLTextureDescriptor*   m_TexDesc;
+    k3d::ResourceDesc       m_Desc;
+    MTLStorageMode          storageMode;
+    
+    MTLTextureUsage         usage;
+    Device*                 m_Device;
+};
+#if 0
+class CommandContext : public k3d::ICommandContext
+{
+public:
+    CommandContext(k3d::ECommandType const & cmdType, id<MTLCommandBuffer> cmdBuf);
     
     ~CommandContext() override;
     
-    void Detach(rhi::IDevice *) override;
+    void Detach(k3d::IDevice *) override;
     
-    void CopyTexture(const rhi::TextureCopyLocation& Dest, const rhi::TextureCopyLocation& Src) override;
-    void CopyBuffer(rhi::IGpuResource& Dest, rhi::IGpuResource& Src, rhi::CopyBufferRegion const & Region) override;
-    void TransitionResourceBarrier(rhi::GpuResourceRef resource, /*EPipelineStage stage,*/ rhi::EResourceState dstState) override {}
+    void CopyTexture(const k3d::TextureCopyLocation& Dest, const k3d::TextureCopyLocation& Src) override;
+    void CopyBuffer(k3d::IGpuResource& Dest, k3d::IGpuResource& Src, k3d::CopyBufferRegion const & Region) override;
+    void TransitionResourceBarrier(k3d::GpuResourceRef resource, /*EPipelineStage stage,*/ k3d::EResourceState dstState) override {}
     void Execute(bool Wait) override;
     void Reset() override;
     
     void Begin() override;
     
-    void ClearColorBuffer(rhi::GpuResourceRef, kMath::Vec4f const&) override {}
-    void ClearDepthBuffer(rhi::IDepthBuffer*) override {}
+    void ClearColorBuffer(k3d::GpuResourceRef, kMath::Vec4f const&) override {}
+    void ClearDepthBuffer(k3d::IDepthBuffer*) override {}
     
     void BeginRendering() override;
-    void SetRenderTargets(uint32 NumColorBuffer, rhi::IColorBuffer*, rhi::IDepthBuffer*, bool ReadOnlyDepth = false) override {}
-    void SetRenderTarget(rhi::RenderTargetRef) override;
-    void SetPipelineState(uint32 HashCode, rhi::PipelineStateObjectRef) override;
-    void SetPipelineLayout(rhi::PipelineLayoutRef) override {}
-    void SetScissorRects(uint32, const rhi::Rect*) override {}
-    void SetViewport(const rhi::ViewportDesc &) override;
-    void SetPrimitiveType(rhi::EPrimitiveType) override;
-    void SetIndexBuffer(const rhi::IndexBufferView& IBView) override;
-    void SetVertexBuffer(uint32 Slot, const rhi::VertexBufferView& VBView) override;
-    void DrawInstanced(rhi::DrawInstancedParam) override;
-    void DrawIndexedInstanced(rhi::DrawIndexedInstancedParam) override;
+    void SetRenderTargets(uint32 NumColorBuffer, k3d::IColorBuffer*, k3d::IDepthBuffer*, bool ReadOnlyDepth = false) override {}
+    void SetRenderTarget(k3d::RenderTargetRef) override;
+    void SetPipelineState(uint32 HashCode, k3d::PipelineStateObjectRef) override;
+    void SetPipelineLayout(k3d::PipelineLayoutRef) override {}
+    void SetScissorRects(uint32, const k3d::Rect*) override {}
+    void SetViewport(const k3d::ViewportDesc &) override;
+    void SetPrimitiveType(k3d::EPrimitiveType) override;
+    void SetIndexBuffer(const k3d::IndexBufferView& IBView) override;
+    void SetVertexBuffer(uint32 Slot, const k3d::VertexBufferView& VBView) override;
+    void DrawInstanced(k3d::DrawInstancedParam) override;
+    void DrawIndexedInstanced(k3d::DrawIndexedInstancedParam) override;
     void EndRendering() override;
-    void PresentInViewport(rhi::RenderViewportRef rvp) override;
+    void PresentInViewport(k3d::RenderViewportRef rvp) override;
     
     void Dispatch(uint32 X = 1, uint32 Y =1, uint32 Z = 1) override;
     
-    void ExecuteBundle(rhi::ICommandContext*) override {}
+    void ExecuteBundle(k3d::ICommandContext*) override {}
     
     void End() override;
     
@@ -192,7 +330,7 @@ protected:
     
 private:
     MTLRenderPassDescriptor*        m_RenderpassDesc;
-    rhi::ECommandType               m_CommandType;
+    k3d::ECommandType               m_CommandType;
     MTLPrimitiveType                m_CurPrimType;
     id<MTLComputeCommandEncoder>    m_ComputeEncoder;
     id<MTLRenderCommandEncoder>     m_RenderEncoder;
@@ -201,20 +339,19 @@ private:
     
     id<MTLBuffer>                   m_TmpIndexBuffer;
 };
-
-class RenderViewport : public rhi::IRenderViewport
+class RenderViewport : public k3d::IRenderViewport
 {
 public:
     RenderViewport(CAMetalLayer * mtlLayer = nil);
     ~RenderViewport() override;
     
-    bool                    InitViewport(void *windowHandle, rhi::IDevice * pDevice, rhi::GfxSetting &) override;
+    bool                    InitViewport(void *windowHandle, k3d::IDevice * pDevice, k3d::GfxSetting &) override;
     void                    PrepareNextFrame() override;
     bool                    Present(bool vSync) override { return false; }
     
-    rhi::RenderTargetRef    GetRenderTarget(uint32 index) override { return nullptr; }
+    k3d::RenderTargetRef    GetRenderTarget(uint32 index) override { return nullptr; }
     
-    rhi::RenderTargetRef    GetCurrentBackRenderTarget() override;
+    k3d::RenderTargetRef    GetCurrentBackRenderTarget() override;
     uint32                  GetSwapChainCount()override { return 0; }
     uint32                  GetSwapChainIndex()override { return 0; }
     
@@ -232,8 +369,9 @@ private:
     uint32                  m_Width;
     uint32                  m_Height;
 };
+#endif
 
-class RenderTarget : public rhi::IRenderTarget
+class RenderTarget : public k3d::IRenderTarget
 {
 public:
     RenderTarget() {}
@@ -242,7 +380,7 @@ public:
     
     void                SetClearColor(kMath::Vec4f clrColor) override;
     void                SetClearDepthStencil(float depth, uint32 stencil) override;
-    rhi::GpuResourceRef	GetBackBuffer() override;
+    k3d::GpuResourceRef	GetBackBuffer() override;
     
     friend class        CommandContext;
 private:
@@ -250,16 +388,16 @@ private:
     id<MTLTexture>          m_ColorTexture;
 };
 
-class Sampler : public rhi::ISampler
+class Sampler : public k3d::ISampler
 {
 public:
-    explicit Sampler(rhi::SamplerState const & state);
+    explicit Sampler(k3d::SamplerState const & state);
     ~Sampler() override;
     
-    rhi::SamplerState       GetSamplerDesc() const override;
+    k3d::SamplerState       GetSamplerDesc() const override;
     
 private:
-    id <MTLSamplerState>    m_SampleState;
+    id<MTLSamplerState>    m_SampleState;
 };
 
 NS_K3D_METAL_END

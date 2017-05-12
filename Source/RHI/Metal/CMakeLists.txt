@@ -2,13 +2,6 @@ include_directories(.)
 set(TARGET RHI_Metal)
 
 set(SRCS 
-Private/MetalDevice.mm
-Private/MetalCommandContext.mm
-Private/MetalBuffer.mm
-Private/MetalTexture.mm
-Private/MetalPipelineState.mm
-Private/MetalResource.mm
-Private/Shader.mm
 Private/MetalRHI.mm
 Private/MetalRHI.h
 )

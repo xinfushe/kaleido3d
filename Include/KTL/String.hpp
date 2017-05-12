@@ -2,6 +2,7 @@
 
 #include "Allocator.hpp"
 #include "Archive.hpp"
+#include <stdarg.h>
 
 K3D_COMMON_NS
 {
