@@ -57,6 +57,7 @@ private:
 
   k3d::PipelineStateRef m_pPso;
   k3d::PipelineLayoutRef m_pl;
+  k3d::BindingGroupRef m_BindingGroup;
   k3d::SyncFenceRef m_pFence;
 };
 
@@ -175,7 +176,7 @@ CubeMesh::Upload()
   stageDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostCoherent |
                    k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
   stageDesc.Size = m_szVBuf;
-  auto vStageBuf = m_pDevice->NewGpuResource(stageDesc);
+  auto vStageBuf = m_pDevice->CreateResource(stageDesc);
   void* ptr = vStageBuf->Map(0, m_szVBuf);
   memcpy(ptr, &m_VertexBuffer[0], m_szVBuf);
   vStageBuf->UnMap();
@@ -185,7 +186,7 @@ CubeMesh::Upload()
   bufferDesc.Size = m_szVBuf;
   bufferDesc.CreationFlag = k3d::EGpuResourceCreationFlag::EGRCF_TransferDst;
   bufferDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_DeviceVisible;
-  vbuf = m_pDevice->NewGpuResource(bufferDesc);
+  vbuf = m_pDevice->CreateResource(bufferDesc);
 
   auto pQueue = m_pDevice->CreateCommandQueue(k3d::ECMD_Graphics);
   auto cmdBuf = pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
@@ -227,7 +228,7 @@ TCubeUnitTest::CreateStageBuffer(uint64 size)
   stageDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostCoherent |
                    k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
   stageDesc.Size = size;
-  return m_pDevice->NewGpuResource(stageDesc);
+  return m_pDevice->CreateResource(stageDesc);
 }
 
 void
@@ -242,12 +243,12 @@ TCubeUnitTest::LoadTexture()
     auto texStageBuf = CreateStageBuffer(m_Texture->GetSize());
     m_Texture->MapIntoBuffer(texStageBuf);
     m_Texture->CopyAndInitTexture(texStageBuf);
-    k3d::ResourceViewDesc viewDesc;
-    auto srv = m_pDevice->NewShaderResourceView(m_Texture->GetResource(), viewDesc);
+    k3d::SRVDesc viewDesc;
+    auto srv = m_pDevice->CreateShaderResourceView(m_Texture->GetResource(), viewDesc);
     auto texure = StaticPointerCast<k3d::ITexture>(m_Texture->GetResource()); //
     texure->SetResourceView(Move(srv)); // here
     k3d::SamplerState samplerDesc;
-    auto sampler2D = m_pDevice->NewSampler(samplerDesc);
+    auto sampler2D = m_pDevice->CreateSampler(samplerDesc);
     texure->BindSampler(Move(sampler2D));
   }
 }
@@ -263,7 +264,7 @@ TCubeUnitTest::PrepareResource()
   desc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
   desc.ViewType = k3d::EGpuMemViewType::EGVT_CBV;
   desc.Size = sizeof(ConstantBuffer);
-  m_ConstBuffer = m_pDevice->NewGpuResource(desc);
+  m_ConstBuffer = m_pDevice->CreateResource(desc);
   OnUpdate();
 }
 
@@ -276,10 +277,10 @@ TCubeUnitTest::PreparePipeline()
   auto vertBinding = vertSh.BindingTable;
   auto fragBinding = fragSh.BindingTable;
   auto mergedBindings = vertBinding | fragBinding;
-  m_pl = m_pDevice->NewPipelineLayout(mergedBindings);
-  auto descriptor = m_pl->GetDescriptorSet();
-  descriptor->Update(0, m_ConstBuffer);
-  descriptor->Update(1, m_Texture->GetResource());
+  m_pl = m_pDevice->CreatePipelineLayout(mergedBindings);
+  m_BindingGroup = m_pl->ObtainBindingGroup();
+  m_BindingGroup->Update(0, m_ConstBuffer);
+  m_BindingGroup->Update(1, m_Texture->GetResource());
 
   k3d::RenderPipelineStateDesc desc;
   desc.AttachmentsBlend.Append(AttachmentState());
@@ -304,27 +305,6 @@ void
 TCubeUnitTest::PrepareCommandBuffer()
 {
   m_pFence = m_pDevice->CreateFence();
-#if 0
-	for (uint32 i = 0; i < m_pViewport->GetSwapChainCount(); i++)
-	{
-		auto pRT = m_pViewport->GetRenderTarget(i);
-		auto gfxCmd = m_pDevice->NewCommandContext(k3d::ECMD_Graphics);
-		gfxCmd->Begin();
-		gfxCmd->TransitionResourceBarrier(pRT->GetBackBuffer(), k3d::ERS_RenderTarget);
-		gfxCmd->SetPipelineLayout(m_pl);
-		k3d::Rect rect{ 0,0, (long)m_pViewport->GetWidth(), (long)m_pViewport->GetHeight() };
-		gfxCmd->SetRenderTarget(pRT);
-		gfxCmd->SetScissorRects(1, &rect);
-		gfxCmd->SetViewport(k3d::ViewportDesc(1.f*m_pViewport->GetWidth(), 1.f*m_pViewport->GetHeight()));
-		gfxCmd->SetPipelineState(0, m_pPso);
-		gfxCmd->SetVertexBuffer(0, m_CubeMesh->VBO());
-		gfxCmd->DrawInstanced(k3d::DrawInstancedParam(36, 1));
-		gfxCmd->EndRendering();
-		gfxCmd->TransitionResourceBarrier(pRT->GetBackBuffer(), k3d::ERS_Present);
-		gfxCmd->End();
-		m_Cmds.push_back(gfxCmd);
-	}
-#endif
 }
 
 void
@@ -351,7 +331,7 @@ TCubeUnitTest::OnProcess(Message& msg)
   auto commandBuffer = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
   // command encoder like Metal does, should use desc instead, look obj from cache
   auto renderCmd = commandBuffer->RenderCommandEncoder(Desc);
-  renderCmd->SetPipelineLayout(m_pl);
+  renderCmd->SetBindingGroup(m_BindingGroup);
   k3d::Rect rect{ 0, 0, ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height };
   renderCmd->SetScissorRect(rect);
   renderCmd->SetViewport(k3d::ViewportDesc(ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height));

@@ -21,14 +21,14 @@ struct ConstantBuffer
   Mat4f viewMatrix;
 };
 
-class TriangleApp : public RHIAppBase
+class TriangleDSApp : public RHIAppBase
 {
 public:
-  TriangleApp(kString const& appName, uint32 width, uint32 height)
+  TriangleDSApp(kString const& appName, uint32 width, uint32 height)
     : RHIAppBase(appName, width, height, true)
   {
   }
-  explicit TriangleApp(kString const& appName)
+  explicit TriangleDSApp(kString const& appName)
     : RHIAppBase(appName, 1920, 1080, true)
   {
   }
@@ -49,20 +49,21 @@ private:
   k3d::IShCompiler::Ptr m_Compiler;
   std::unique_ptr<TriangleMesh> m_TriMesh;
 
+  k3d::GpuResourceRef m_pDepthStencilTexture;
+
   k3d::GpuResourceRef m_ConstBuffer;
   ConstantBuffer m_HostBuffer;
 
   k3d::PipelineStateRef m_pPso;
   k3d::PipelineLayoutRef m_pl;
-
   k3d::BindingGroupRef m_BindingGroup;
-
+  k3d::RenderPassDesc m_RenderPassDesc;
   k3d::RenderPassRef m_pRenderPass;
 
   k3d::SyncFenceRef m_pFence;
 };
 
-K3D_APP_MAIN(TriangleApp)
+K3D_APP_MAIN(TriangleDSApp)
 
 class TriangleMesh
 {
@@ -176,7 +177,7 @@ TriangleMesh::Upload(k3d::CommandQueueRef pQueue)
 }
 
 bool
-TriangleApp::OnInit()
+TriangleDSApp::OnInit()
 {
   bool inited = RHIAppBase::OnInit();
   if (!inited)
@@ -193,7 +194,7 @@ TriangleApp::OnInit()
 }
 
 void
-TriangleApp::PrepareResource()
+TriangleDSApp::PrepareResource()
 {
   KLOG(Info, Test, __K3D_FUNC__);
   m_TriMesh = std::make_unique<TriangleMesh>(m_pDevice);
@@ -205,24 +206,43 @@ TriangleApp::PrepareResource()
   desc.Size = sizeof(ConstantBuffer);
   m_ConstBuffer = m_pDevice->CreateResource(desc);
   OnUpdate();
+
+  desc.Flag = EGRAF_DeviceVisible;
+  desc.Type = EGT_Texture2D;
+  desc.ViewType = EGVT_DSV;
+
+  auto SwSize = m_pSwapChain->GetCurrentTexture()->GetDesc().TextureDesc;
+  desc.TextureDesc = { EPF_D24_S8, SwSize.Width, SwSize.Height, 1, 1, 1 };
+  m_pDepthStencilTexture = m_pDevice->CreateResource(desc);
 }
 
 void
-TriangleApp::PrepareRenderPass()
+TriangleDSApp::PrepareRenderPass()
 {
   k3d::ColorAttachmentDesc ColorAttach;
   ColorAttach.pTexture = m_pSwapChain->GetCurrentTexture();
   ColorAttach.LoadAction = k3d::ELA_Clear;
   ColorAttach.StoreAction = k3d::ESA_Store;
   ColorAttach.ClearColor = Vec4f(1, 1, 1, 1);
+  m_RenderPassDesc.ColorAttachments.Append(ColorAttach);
+ 
+  m_RenderPassDesc.pDepthAttachment = MakeShared<DepthAttachmentDesc>();
+  m_RenderPassDesc.pDepthAttachment->LoadAction = k3d::ELA_Clear;
+  m_RenderPassDesc.pDepthAttachment->StoreAction = k3d::ESA_Store;
+  m_RenderPassDesc.pDepthAttachment->ClearDepth = 1.0f;
+  m_RenderPassDesc.pDepthAttachment->pTexture = StaticPointerCast<k3d::ITexture>(m_pDepthStencilTexture);
 
-  k3d::RenderPassDesc Desc;
-  Desc.ColorAttachments.Append(ColorAttach);
-  m_pRenderPass = m_pDevice->CreateRenderPass(Desc);
+  m_RenderPassDesc.pStencilAttachment = MakeShared<StencilAttachmentDesc>();
+  m_RenderPassDesc.pStencilAttachment->LoadAction = k3d::ELA_Clear;
+  m_RenderPassDesc.pStencilAttachment->StoreAction = k3d::ESA_Store;
+  m_RenderPassDesc.pStencilAttachment->ClearStencil = 0.0f;
+  m_RenderPassDesc.pStencilAttachment->pTexture = StaticPointerCast<k3d::ITexture>(m_pDepthStencilTexture);
+
+  m_pRenderPass = m_pDevice->CreateRenderPass(m_RenderPassDesc);
 }
 
 void
-TriangleApp::PreparePipeline()
+TriangleDSApp::PreparePipeline()
 {
   k3d::ShaderBundle vertSh, fragSh;
   Compile("asset://Test/triangle.vert", k3d::ES_Vertex, vertSh);
@@ -236,6 +256,8 @@ TriangleApp::PreparePipeline()
   auto attrib = vertSh.Attributes;
   k3d::RenderPipelineStateDesc desc;
   desc.AttachmentsBlend.Append(AttachmentState());
+  desc.DepthStencil.DepthEnable = true;
+  desc.DepthStencil.StencilEnable = true;
   desc.VertexShader = vertSh;
   desc.PixelShader = fragSh;
   desc.InputState = m_TriMesh->GetInputState();
@@ -244,34 +266,27 @@ TriangleApp::PreparePipeline()
 }
 
 void
-TriangleApp::PrepareCommandBuffer()
+TriangleDSApp::PrepareCommandBuffer()
 {
   m_pFence = m_pDevice->CreateFence();
 }
 
 void
-TriangleApp::OnDestroy()
+TriangleDSApp::OnDestroy()
 {
   App::OnDestroy();
   m_TriMesh->~TriangleMesh();
 }
 
 void
-TriangleApp::OnProcess(Message& msg)
+TriangleDSApp::OnProcess(Message& msg)
 {
   auto currentImage = m_pSwapChain->GetCurrentTexture();
   auto ImageDesc = currentImage->GetDesc();
-  k3d::ColorAttachmentDesc ColorAttach;
-  ColorAttach.pTexture = currentImage;
-  ColorAttach.LoadAction = k3d::ELA_Clear;
-  ColorAttach.StoreAction = k3d::ESA_Store;
-  ColorAttach.ClearColor = Vec4f(1, 1, 1, 1);
-
-  k3d::RenderPassDesc Desc;
-  Desc.ColorAttachments.Append(ColorAttach);
-
+  m_RenderPassDesc.ColorAttachments[0].pTexture = currentImage;
   auto commandBuffer = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
-  auto renderCmd = commandBuffer->RenderCommandEncoder(Desc);
+  // command encoder like Metal does, should use desc instead, look obj from cache
+  auto renderCmd = commandBuffer->RenderCommandEncoder(m_RenderPassDesc);
   renderCmd->SetBindingGroup(m_BindingGroup);
   k3d::Rect rect{ 0, 0, ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height };
   renderCmd->SetScissorRect(rect);
@@ -287,7 +302,7 @@ TriangleApp::OnProcess(Message& msg)
 }
 
 void
-TriangleApp::OnUpdate()
+TriangleDSApp::OnUpdate()
 {
   m_HostBuffer.projectionMatrix =
     Perspective(60.0f, (float)1920 / (float)1080, 0.1f, 256.0f);

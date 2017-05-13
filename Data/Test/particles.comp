@@ -57,8 +57,8 @@ cbuffer cbCS : register(b0)
 //RWStructuredBuffer<float4> velocity_buffer  : register(u0); // UAV
 //RWStructuredBuffer<float4> position_buffer  : register(u1); // UAV
 
-RWTexture1D <float4> velocity_buffer : register(t0);
-RWTexture1D <float4> position_buffer : register(t1);
+RWTexture1D <float4> velocity_buffer : register(u0);
+RWTexture1D <float4> position_buffer : register(u1);
 
 [numthreads(1024, 1, 1)]
 void main(

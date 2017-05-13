@@ -14,28 +14,28 @@ CalcAlignedOffset(VkDeviceSize offset, VkDeviceSize align)
   return result;
 }
 // Buffer functors
-decltype(vkCreateBufferView)* ResTrait<VkBuffer>::CreateView =
+decltype(vkCreateBufferView)* ResTrait<k3d::IBuffer>::CreateView =
   &vkCreateBufferView;
-decltype(vkDestroyBufferView)* ResTrait<VkBuffer>::DestroyView =
+decltype(vkDestroyBufferView)* ResTrait<k3d::IBuffer>::DestroyView =
   &vkDestroyBufferView;
-decltype(vkCreateBuffer)* ResTrait<VkBuffer>::Create = &vkCreateBuffer;
-decltype(vkDestroyBuffer)* ResTrait<VkBuffer>::Destroy = &vkDestroyBuffer;
-decltype(vkGetBufferMemoryRequirements)* ResTrait<VkBuffer>::GetMemoryInfo =
+decltype(vkCreateBuffer)* ResTrait<k3d::IBuffer>::Create = &vkCreateBuffer;
+decltype(vkDestroyBuffer)* ResTrait<k3d::IBuffer>::Destroy = &vkDestroyBuffer;
+decltype(vkGetBufferMemoryRequirements)* ResTrait<k3d::IBuffer>::GetMemoryInfo =
   &vkGetBufferMemoryRequirements;
-decltype(vkBindBufferMemory)* ResTrait<VkBuffer>::BindMemory =
+decltype(vkBindBufferMemory)* ResTrait<k3d::IBuffer>::BindMemory =
   &vkBindBufferMemory;
 
-decltype(vkCreateImageView)* ResTrait<VkImage>::CreateView = &vkCreateImageView;
-decltype(vkDestroyImageView)* ResTrait<VkImage>::DestroyView =
+decltype(vkCreateImageView)* ResTrait<k3d::ITexture>::CreateView = &vkCreateImageView;
+decltype(vkDestroyImageView)* ResTrait<k3d::ITexture>::DestroyView =
   &vkDestroyImageView;
-decltype(vkCreateImage)* ResTrait<VkImage>::Create = &vkCreateImage;
-decltype(vkDestroyImage)* ResTrait<VkImage>::Destroy = &vkDestroyImage;
-decltype(vkGetImageMemoryRequirements)* ResTrait<VkImage>::GetMemoryInfo =
+decltype(vkCreateImage)* ResTrait<k3d::ITexture>::Create = &vkCreateImage;
+decltype(vkDestroyImage)* ResTrait<k3d::ITexture>::Destroy = &vkDestroyImage;
+decltype(vkGetImageMemoryRequirements)* ResTrait<k3d::ITexture>::GetMemoryInfo =
   &vkGetImageMemoryRequirements;
-decltype(vkBindImageMemory)* ResTrait<VkImage>::BindMemory = &vkBindImageMemory;
+decltype(vkBindImageMemory)* ResTrait<k3d::ITexture>::BindMemory = &vkBindImageMemory;
 
 Buffer::Buffer(Device::Ptr pDevice, k3d::ResourceDesc const& desc)
-  : TResource<VkBuffer, k3d::IGpuResource>(pDevice, desc)
+  : Super(pDevice, desc)
 {
   m_ResUsageFlags = g_ResourceViewFlag[desc.ViewType];
 
@@ -77,7 +77,7 @@ Buffer::Create(size_t size)
   createInfo.queueFamilyIndexCount = 0;
   createInfo.pQueueFamilyIndices = nullptr;
 
-  TResource<VkBuffer, k3d::IGpuResource>::Allocate(createInfo);
+  Super::Allocate(createInfo);
 
   m_ResDescInfo.buffer = m_NativeObj;
   m_ResDescInfo.offset = 0;
@@ -88,7 +88,7 @@ Buffer::Create(size_t size)
 }
 
 Texture::Texture(Device::Ptr pDevice, k3d::ResourceDesc const& desc)
-  : Texture::ThisResourceType(pDevice, desc)
+  : Texture::Super(pDevice, desc)
 {
   InitCreateInfos();
 }
@@ -98,7 +98,7 @@ Texture::Texture(k3d::ResourceDesc const& Desc,
                  // VkImageView imageView,
                  Device::Ptr pDevice,
                  bool selfOwnShip)
-  : Texture::ThisResourceType(pDevice, selfOwnShip)
+  : Texture::Super(pDevice, selfOwnShip)
 {
   m_ResDesc = Desc;
   m_NativeObj = image;
@@ -243,7 +243,7 @@ VkImageCreateInfo ConvertFromTextureDesc(k3d::ResourceDesc const& ResDesc)
   Info.usage = 0;
   
   if (ResDesc.Flag == EGRAF_DeviceVisible
-    && (ResDesc.CreationFlag & EGRCF_TransferDst)
+    || (ResDesc.CreationFlag & EGRCF_TransferDst)
     ) // texture upload use staging
   {
     Info.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -296,6 +296,8 @@ void Texture::InitCreateInfos()
       m_ResDesc.TextureDesc.Layers };
     break;
   case k3d::EGVT_DSV:
+    m_ImageInfo.usage = m_ResUsageFlags | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    m_MemoryBits = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     m_SubResRange = { VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
       0,
       m_ResDesc.TextureDesc.MipLevels,
@@ -303,8 +305,22 @@ void Texture::InitCreateInfos()
       m_ResDesc.TextureDesc.Layers };
     break;
   }
-  ThisResourceType::Allocate(m_ImageInfo);
+  Super::Allocate(m_ImageInfo);
   K3D_VK_VERIFY(vkBindImageMemory(NativeDevice(), m_NativeObj, m_DeviceMem, 0));
+  // TODO Allocate Resource View
+  m_ImageViewInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    nullptr,
+    0,
+    m_NativeObj,
+    ConvertFromTextureType(m_ResDesc.Type),
+    g_FormatTable[m_ResDesc.TextureDesc.Format],
+    { VK_COMPONENT_SWIZZLE_R,
+    VK_COMPONENT_SWIZZLE_G,
+    VK_COMPONENT_SWIZZLE_B,
+    VK_COMPONENT_SWIZZLE_A },
+    m_SubResRange };
+  K3D_VK_VERIFY(
+    vkCreateImageView(NativeDevice(), &m_ImageViewInfo, nullptr, &m_ResView));
 }
 
 Texture::~Texture()
@@ -312,7 +328,7 @@ Texture::~Texture()
 }
 
 ShaderResourceView::ShaderResourceView(Device::Ptr pDevice,
-                                       k3d::ResourceViewDesc const& desc,
+                                       k3d::SRVDesc const& desc,
                                        k3d::GpuResourceRef pGpuResource)
   : ShaderResourceView::ThisObj(pDevice)
   , m_Desc(desc)

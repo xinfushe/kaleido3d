@@ -348,7 +348,7 @@ CommandBuffer::RenderCommandEncoder(k3d::RenderPassDesc const& Desc)
 {
   auto pRenderpass = StaticPointerCast<RenderPass>(m_Device->CreateRenderPass(Desc));
   auto pFramebuffer = m_Device->GetOrCreateFramebuffer(Desc);
-  pRenderpass->Begin(m_NativeObj, pFramebuffer);
+  pRenderpass->Begin(m_NativeObj, pFramebuffer, Desc);
   return MakeShared<vk::RenderCommandEncoder>(SharedFromThis(),
                                               ECmdLevel::Primary);
 }
@@ -364,7 +364,7 @@ CommandBuffer::ParallelRenderCommandEncoder(k3d::RenderPassDesc const& Desc)
 {
   auto pRenderpass = StaticPointerCast<RenderPass>(m_Device->CreateRenderPass(Desc));
   auto pFramebuffer = m_Device->GetOrCreateFramebuffer(Desc);
-  pRenderpass->Begin(m_NativeObj, pFramebuffer, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS); // next append secondary cmds
+  pRenderpass->Begin(m_NativeObj, pFramebuffer, Desc, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS); // next append secondary cmds
   return MakeShared<vk::ParallelCommandEncoder>(SharedFromThis());
 }
 
@@ -492,7 +492,25 @@ CommandBuffer::Transition(k3d::GpuResourceRef pResource,
     VkBufferMemoryBarrier BufferBarrier = {
       VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, nullptr,
     };
-  } else // ImageLayout Transition
+    auto pBuffer = StaticPointerCast<Buffer>(pResource);
+    BufferBarrier.buffer = pBuffer->NativeHandle();
+    BufferBarrier.size = pBuffer->GetSize();
+    BufferBarrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;			// Vertex shader invocations have finished reading from the buffer
+    BufferBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;								// Compute shader wants to write to the buffer
+                                                                            // Transfer ownership if compute and graphics queue familiy indices differ
+    //BufferBarrier.srcQueueFamilyIndex = vulkanDevice->queueFamilyIndices.graphics;
+    //BufferBarrier.dstQueueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
+
+    vkCmdPipelineBarrier(
+      m_NativeObj,
+      VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      0,
+      0, nullptr,
+      1, &BufferBarrier,
+      0, nullptr);
+
+  } else if(State != ERS_VertexAndConstantBuffer)// ImageLayout Transition
   {
     //if (pResource->GetState() == State)
     //  return;
@@ -1110,7 +1128,6 @@ PipelineLayout::PipelineLayout(Device::Ptr pDevice,
                                k3d::PipelineLayoutDesc const& desc)
   : PipelineLayout::ThisObj(pDevice)
   , m_DescSetLayout(nullptr)
-  , m_DescSet()
 {
   InitWithDesc(desc);
 }
@@ -1118,6 +1135,16 @@ PipelineLayout::PipelineLayout(Device::Ptr pDevice,
 PipelineLayout::~PipelineLayout()
 {
   Destroy();
+}
+
+k3d::BindingGroupRef 
+PipelineLayout::ObtainBindingGroup()
+{
+    return k3d::BindingGroupRef(DescriptorSet::CreateDescSet(
+      SharedFromThis(),
+      m_DescSetLayout->GetNativeHandle(), 
+      m_BindingArray, 
+      m_Device));
 }
 
 void
@@ -1173,19 +1200,21 @@ void
 PipelineLayout::InitWithDesc(k3d::PipelineLayoutDesc const& desc)
 {
   DescriptorAllocator::Options options;
-  BindingArray array = ExtractBindingsFromTable(desc.Bindings);
-  auto alloc = m_Device->NewDescriptorAllocator(16, array);
-  m_DescSetLayout = m_Device->NewDescriptorSetLayout(array);
-  m_DescSet = k3d::DescriptorRef(DescriptorSet::CreateDescSet(
-    alloc, m_DescSetLayout->GetNativeHandle(), array, m_Device));
+  m_BindingArray = ExtractBindingsFromTable(desc.Bindings);
+  // 
+  m_DescAllocator = m_Device->NewDescriptorAllocator(16, m_BindingArray);
+  // 
+  m_DescSetLayout = m_Device->NewDescriptorSetLayout(m_BindingArray);
 
   VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
   pPipelineLayoutCreateInfo.sType =
     VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pPipelineLayoutCreateInfo.pNext = NULL;
+  // TODO
   pPipelineLayoutCreateInfo.setLayoutCount = 1;
   pPipelineLayoutCreateInfo.pSetLayouts =
     &m_DescSetLayout->m_DescriptorSetLayout;
+
   K3D_VK_VERIFY(vkCreatePipelineLayout(
     NativeDevice(), &pPipelineLayoutCreateInfo, nullptr, &m_NativeObj));
 }
@@ -1210,13 +1239,17 @@ RHIDataType2VkType(k3d::shc::EBindType const& type)
     case k3d::shc::EBindType::ESampler:
       return VK_DESCRIPTOR_TYPE_SAMPLER;
     case k3d::shc::EBindType::ESampledImage:
-      return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+      return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE; // ReadOnly Texture
     case k3d::shc::EBindType::ESamplerImageCombine:
       return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     case k3d::shc::EBindType::EStorageImage:
       return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     case k3d::shc::EBindType::EStorageBuffer:
       return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    case k3d::shc::EBindType::ERWTexelBuffer:
+      return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+      //VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER ReadOnly ImageBuffer, texel fetch
+      //VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER Read&Write ImageBuffer
   }
   return VK_DESCRIPTOR_TYPE_MAX_ENUM;
 }
@@ -1325,29 +1358,33 @@ DescriptorSetLayout::Destroy()
   m_DescriptorSetLayout = VK_NULL_HANDLE;
 }
 
-DescriptorSet::DescriptorSet(DescriptorAllocRef descriptorAllocator,
+DescriptorSet::DescriptorSet(SpPipelineLayout pRootLayout,
                              VkDescriptorSetLayout layout,
                              BindingArray const& bindings,
                              Device::Ptr pDevice)
-  : DeviceChild(pDevice)
-  , m_DescriptorAllocator(descriptorAllocator)
+  : Super(pDevice)
   , m_Bindings(bindings)
+  , m_RootLayout(pRootLayout)
 {
   Initialize(layout, bindings);
 }
 
 DescriptorSet*
-DescriptorSet::CreateDescSet(DescriptorAllocRef descriptorPool,
+DescriptorSet::CreateDescSet(SpPipelineLayout rootLayout,
                              VkDescriptorSetLayout layout,
                              BindingArray const& bindings,
                              Device::Ptr pDevice)
 {
-  return new DescriptorSet(descriptorPool, layout, bindings, pDevice);
+  return new DescriptorSet(rootLayout, layout, bindings, pDevice);
 }
 
 DescriptorSet::~DescriptorSet()
 {
   Destroy();
+}
+
+void DescriptorSet::Update(uint32 bindSet, k3d::UnorderedAccessViewRef)
+{
 }
 
 void
@@ -1361,11 +1398,11 @@ DescriptorSet::Update(uint32 bindSet, k3d::SamplerRef pRHISampler)
   };
   m_BoundDescriptorSet[bindSet].pImageInfo = &imageInfo;
   vkUpdateDescriptorSets(
-    GetRawDevice(), 1, &m_BoundDescriptorSet[bindSet], 0, NULL);
+    NativeDevice(), 1, &m_BoundDescriptorSet[bindSet], 0, NULL);
   VKLOG(Info,
         "%s , Set (0x%0x) updated with sampler(location:0x%x).",
         __K3D_FUNC__,
-        m_DescriptorSet,
+        NativeHandle(),
         pSampler->NativeHandle());
 }
 
@@ -1375,18 +1412,30 @@ DescriptorSet::Update(uint32 bindSet, k3d::GpuResourceRef gpuResource)
   auto desc = gpuResource->GetDesc();
   switch (desc.Type) {
     case k3d::EGT_Buffer: {
-      VkDescriptorBufferInfo bufferInfo = {
-        (VkBuffer)gpuResource->GetLocation(), 0, gpuResource->GetSize()
-      };
-      m_BoundDescriptorSet[bindSet].pBufferInfo = &bufferInfo;
-      vkUpdateDescriptorSets(
-        GetRawDevice(), 1, &m_BoundDescriptorSet[bindSet], 0, NULL);
-      VKLOG(Info,
-            "%s , Set (0x%0x) updated with buffer(location:0x%x, size:%d).",
-            __K3D_FUNC__,
-            m_DescriptorSet,
-            gpuResource->GetLocation(),
-            gpuResource->GetSize());
+      switch (desc.ViewType)
+      {
+      case EGVT_SRV:
+        break;
+      case EGVT_UAV:
+        break;
+      case EGVT_CBV:
+      {
+        auto buffer = StaticPointerCast<Buffer>(gpuResource);
+        VkDescriptorBufferInfo bufferInfo = {
+          buffer->NativeHandle(), 0, gpuResource->GetSize()
+        };
+        m_BoundDescriptorSet[bindSet].pBufferInfo = &bufferInfo;
+        vkUpdateDescriptorSets(
+          NativeDevice(), 1, &m_BoundDescriptorSet[bindSet], 0, NULL);
+        VKLOG(Info,
+          "%s , Set (0x%0x) updated with buffer(location:0x%x, size:%d).",
+          __K3D_FUNC__,
+          NativeHandle(),
+          buffer->NativeHandle(),
+          gpuResource->GetSize());
+        break;
+      }
+      }
       break;
     }
     case k3d::EGT_Texture1D:
@@ -1405,11 +1454,11 @@ DescriptorSet::Update(uint32 bindSet, k3d::GpuResourceRef gpuResource)
       }; //TODO : sampler shouldn't be null
       m_BoundDescriptorSet[bindSet].pImageInfo = &imageInfo;
       vkUpdateDescriptorSets(
-        GetRawDevice(), 1, &m_BoundDescriptorSet[bindSet], 0, NULL);
+        NativeDevice(), 1, &m_BoundDescriptorSet[bindSet], 0, NULL);
       VKLOG(Info,
             "%s , Set (0x%0x) updated with image(location:0x%x, size:%d).",
             __K3D_FUNC__,
-            m_DescriptorSet,
+            NativeHandle(),
             gpuResource->GetLocation(),
             gpuResource->GetSize());
       break;
@@ -1431,16 +1480,16 @@ DescriptorSet::Initialize(VkDescriptorSetLayout layout,
   VkDescriptorSetAllocateInfo allocInfo = {
     VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO
   };
-  allocInfo.descriptorPool = m_DescriptorAllocator->m_Pool;
+  allocInfo.descriptorPool = m_RootLayout->Pool();
   allocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
   allocInfo.pSetLayouts = layouts.empty() ? nullptr : layouts.data();
   K3D_VK_VERIFY(
-    vkAllocateDescriptorSets(GetRawDevice(), &allocInfo, &m_DescriptorSet));
-  VKLOG(Info, "%s , Set (0x%0x) created.", __K3D_FUNC__, m_DescriptorSet);
+    vkAllocateDescriptorSets(NativeDevice(), &allocInfo, &m_NativeObj));
+  VKLOG(Info, "%s , Set (0x%0x) created.", __K3D_FUNC__, m_NativeObj);
 
   for (auto& binding : m_Bindings) {
     VkWriteDescriptorSet entry = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    entry.dstSet = m_DescriptorSet;
+    entry.dstSet = m_NativeObj;
     entry.descriptorCount = 1;
     entry.dstArrayElement = 0;
     entry.dstBinding = binding.binding;
@@ -1452,23 +1501,19 @@ DescriptorSet::Initialize(VkDescriptorSetLayout layout,
 void
 DescriptorSet::Destroy()
 {
-  if (VK_NULL_HANDLE == m_DescriptorSet || !GetRawDevice())
+  if (VK_NULL_HANDLE == m_NativeObj)
     return;
-
-  if (m_DescriptorAllocator) {
-    // const auto& options = m_DescriptorAllocator->m_Options;
-    // if( options.hasFreeDescriptorSetFlag() ) {
-    VkDescriptorSet descSets[1] = { m_DescriptorSet };
-    vkFreeDescriptorSets(
-      GetRawDevice(), m_DescriptorAllocator->m_Pool, 1, descSets);
-    m_DescriptorSet = VK_NULL_HANDLE;
-    //}
-  }
-  VKRHI_METHOD_TRACE
+  // const auto& options = m_DescriptorAllocator->m_Options;
+  // if( options.hasFreeDescriptorSetFlag() ) {
+  VkDescriptorSet descSets[1] = { m_NativeObj };
+  vkFreeDescriptorSets(
+    NativeDevice(), m_RootLayout->Pool(), 1, descSets);
+  m_NativeObj = VK_NULL_HANDLE;
+  //}
 }
 
 VkAttachmentDescription
-ConvertAttachDesc(k3d::AttachmentDesc const& Desc)
+ConvertAttachDesc(k3d::AttachmentDesc const& Desc, bool IsDStarget)
 {
   auto pTexture = StaticPointerCast<Texture>(Desc.pTexture);
   VkFormat Format = g_FormatTable[pTexture->GetDesc().TextureDesc.Format];
@@ -1481,7 +1526,7 @@ ConvertAttachDesc(k3d::AttachmentDesc const& Desc)
     g_LoadAction[Desc.LoadAction],    // VkAttachmentLoadOp              stencilLoadOp;
     g_StoreAction[Desc.StoreAction],  // VkAttachmentStoreOp             stencilStoreOp;
     VK_IMAGE_LAYOUT_UNDEFINED,        // VkImageLayout                   initialLayout;
-    VK_IMAGE_LAYOUT_PRESENT_SRC_KHR         // VkImageLayout                   finalLayout;
+    IsDStarget? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR         // VkImageLayout                   finalLayout;
   };
   return AttachDesc;
 }
@@ -1502,7 +1547,7 @@ RenderPass::RenderPass(Device::Ptr pDevice, k3d::RenderPassDesc const& desc)
   for (auto colorAttach : desc.ColorAttachments) {
     auto pTexture = StaticPointerCast<Texture>(colorAttach.pTexture);
     AttachViews.Append(pTexture->NativeView());
-    Attachs.Append(ConvertAttachDesc(colorAttach));
+    Attachs.Append(ConvertAttachDesc(colorAttach, false));
     ColorRefers.Append({ ColorIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
     ColorIndex++;
   }
@@ -1520,6 +1565,13 @@ RenderPass::RenderPass(Device::Ptr pDevice, k3d::RenderPassDesc const& desc)
   //const uint32_t*                 pPreserveAttachments;
   };
 
+  VkAttachmentReference DSRefer = { 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+  if (desc.pDepthAttachment)
+  {
+    auto DepthAttach = ConvertAttachDesc(*desc.pDepthAttachment, true);
+    Attachs.Append(DepthAttach);
+    defaultSubpass.pDepthStencilAttachment = &DSRefer;
+  }
 
   VkSubpassDependency dependency = { 0 };
   dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -1545,7 +1597,7 @@ RenderPass::RenderPass(Device::Ptr pDevice, k3d::RenderPassDesc const& desc)
     NativeDevice(), &renderPassCreateInfo, nullptr, &m_NativeObj);
 }
 
-void RenderPass::Begin(VkCommandBuffer Cmd, SpFramebuffer pFramebuffer, VkSubpassContents contents)
+void RenderPass::Begin(VkCommandBuffer Cmd, SpFramebuffer pFramebuffer, k3d::RenderPassDesc const& Desc, VkSubpassContents contents)
 {
   VkRect2D RenderArea;
   RenderArea.offset = { 0,0 };
@@ -1554,9 +1606,20 @@ void RenderPass::Begin(VkCommandBuffer Cmd, SpFramebuffer pFramebuffer, VkSubpas
     VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, nullptr,
     m_NativeObj, pFramebuffer->NativeHandle(),
     RenderArea,
-    1, m_ClearVal               // uint32_t               clearValueCount;
-                                // const VkClearValue*    pClearValues;
+    pFramebuffer->m_HasDepthStencil ? 2 : 1, // uint32_t               clearValueCount;
+    m_ClearVal               // const VkClearValue*    pClearValues;
   };
+  if (pFramebuffer->m_HasDepthStencil)
+  {
+    if (Desc.pDepthAttachment)
+    {
+      m_ClearVal[1].depthStencil.depth = Desc.pDepthAttachment->ClearDepth;
+    }
+    if (Desc.pStencilAttachment)
+    {
+      m_ClearVal[1].depthStencil.stencil = Desc.pStencilAttachment->ClearStencil;
+    }
+  }
   vkCmdBeginRenderPass(Cmd, &RenderBeginInfo, contents);
   VKLOG(Info, "Begin renderpass, fbo: 0x%0x.", pFramebuffer->NativeHandle());
 }
@@ -1613,6 +1676,12 @@ FrameBuffer::FrameBuffer(Device::Ptr pDevice, SpRenderpass pRenderPass, k3d::Ren
   for (auto colorAttach : desc.ColorAttachments) {
     auto pTexture = StaticPointerCast<Texture>(colorAttach.pTexture);
     AttachViews.Append(pTexture->NativeView());
+  }
+  if (desc.pDepthAttachment)
+  {
+    auto pTexture = StaticPointerCast<Texture>(desc.pDepthAttachment->pTexture);
+    AttachViews.Append(pTexture->NativeView());
+    m_HasDepthStencil = true;
   }
   // create framebuffer
   VkFramebufferCreateInfo createInfo = {
@@ -2103,8 +2172,14 @@ Device::FindMemoryType(uint32 typeBits,
   return false;
 }
 
+k3d::UnorderedAccessViewRef
+Device::CreateUnorderedAccessView(k3d::GpuResourceRef pResource, k3d::UAVDesc const& Desc)
+{
+  return k3d::UnorderedAccessViewRef();
+}
+
 SamplerRef
-Device::NewSampler(const k3d::SamplerState& samplerDesc)
+Device::CreateSampler(const k3d::SamplerState& samplerDesc)
 {
   return MakeShared<Sampler>(SharedFromThis(), samplerDesc);
 }
@@ -2125,7 +2200,7 @@ HashPipelineLayoutDesc(k3d::PipelineLayoutDesc const& desc)
 }
 
 k3d::PipelineLayoutRef
-Device::NewPipelineLayout(k3d::PipelineLayoutDesc const& table)
+Device::CreatePipelineLayout(k3d::PipelineLayoutDesc const& table)
 {
   // Hash the table parameter here,
   // Lookup the layout by hash code
@@ -2217,7 +2292,7 @@ Device::CreateCommandQueue(k3d::ECommandType const& Type)
 }
 
 GpuResourceRef
-Device::NewGpuResource(k3d::ResourceDesc const& Desc)
+Device::CreateResource(k3d::ResourceDesc const& Desc)
 {
   k3d::IGpuResource* resource = nullptr;
   switch (Desc.Type) {
@@ -2236,10 +2311,10 @@ Device::NewGpuResource(k3d::ResourceDesc const& Desc)
 }
 
 ShaderResourceViewRef
-Device::NewShaderResourceView(k3d::GpuResourceRef pRes,
-                              k3d::ResourceViewDesc const& desc)
+Device::CreateShaderResourceView(k3d::GpuResourceRef pRes,
+                              k3d::SRVDesc const& Desc)
 {
-  return MakeShared<ShaderResourceView>(SharedFromThis(), desc, pRes);
+  return MakeShared<ShaderResourceView>(SharedFromThis(), Desc, pRes);
 }
 
 PtrCmdAlloc
@@ -2257,7 +2332,7 @@ Device::NewSemaphore()
 
 void
 Device::QueryTextureSubResourceLayout(k3d::TextureRef resource,
-                                      k3d::TextureResourceSpec const& spec,
+                                      k3d::TextureSpec const& spec,
                                       k3d::SubResourceLayout* layout)
 {
   K3D_ASSERT(resource);

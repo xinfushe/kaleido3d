@@ -66,7 +66,7 @@ Current Status
 	* [ ] Shadow Mapping (Render To Texture, Z-Pass)
 	* [ ] Deferred Shading (Multi-RenderTarget)
 	* [ ] Tile-Based Cluster Lighting (Compute Shading)
-	* [ ] Multi-Thread Rendering
+	* [x] Multi-Thread Rendering (WIP)
 	* [ ] Multi-GPU/CrossAdapter Rendering
 	* [x] Cross Shader Language Compiler
 	* [ ] Hand-writing Recognition CNN Sample (GPGPU)
@@ -77,8 +77,6 @@ Current Architecture
 =========
 
 ![arch](Document/architect_current.png)
-
-> [RHI Objects were found here.](Document/ApiDifferences.md)
 
 ---
 
@@ -104,35 +102,46 @@ Documents
 	
 ----------
 
-RHI Sample Code
+RHI Snippets
 =======
 
-## Draw a triangle
+> **Draw a triangle**
 
 ``` cpp
-RHIDevices[Global Variable]
-RHIQueues[Global]
--- PerThreadCode
-rhi::PipelineDesc pipelineDesc = {shaders, raster, depthStencil...};
-rhi::IPipelineState pState = device->NewPipelineState(pipelineDesc);
-rhi::ICommandContext* gfxCmd = CommandContext::Begin(pDevice, pQueue);
-	gfxCmd->Begin();
-	gfxCmd->SetPipelineLayout(m_pl);
-	rhi::Rect rect{ 0,0, (long)m_Viewport->GetWidth(), (long)m_Viewport->GetHeight() };
-	gfxCmd->SetRenderTarget(pRT);
-	gfxCmd->SetScissorRects(1, &rect);
-	gfxCmd->SetViewport(rhi::ViewportDesc(m_Viewport->GetWidth(), m_Viewport->GetHeight()));
-	gfxCmd->SetPipelineState(0, m_pPso);
-	gfxCmd->SetIndexBuffer(m_TriMesh->IBO());
-	gfxCmd->SetVertexBuffer(0, m_TriMesh->VBO());
-	gfxCmd->DrawIndexedInstanced(rhi::DrawIndexedInstancedParam(3, 1));
-	gfxCmd->EndRendering();
-	gfxCmd->TransitionResourceBarrier(pRT->GetBackBuffer(), rhi::ERS_RenderTarget, rhi::ERS_Present);
-	gfxCmd->End();
-gfxCmd->FlushAndWait();
---
-swapChain.Present(pQueue, pImage, pWindow[, semaphore])
+void DrawFrame()
+{
+  auto currentImage = m_pSwapChain->GetCurrentTexture();
+  auto ImageDesc = currentImage->GetDesc();
+  k3d::ColorAttachmentDesc ColorAttach;
+  ColorAttach.pTexture = currentImage;
+  // specify renderpass action, optimize for mobile platform's PLS (Pixel Local Storage)
+  ColorAttach.LoadAction = k3d::ELA_Clear;
+  ColorAttach.StoreAction = k3d::ESA_Store;
+  ColorAttach.ClearColor = Vec4f(1, 1, 1, 1);
+
+  k3d::RenderPassDesc Desc;
+  Desc.ColorAttachments.Append(ColorAttach);
+
+  auto commandBuffer = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
+  // command encoder is similar to apple's metal, look up renderpass object from cache
+  // for vulkan, it performs the call "BeginRenderPass"
+  auto renderCmd = commandBuffer->RenderCommandEncoder(Desc);
+  renderCmd->SetBindingGroup(m_BindingGroup);
+  k3d::Rect rect{ 0, 0, ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height };
+  renderCmd->SetScissorRect(rect);
+  renderCmd->SetViewport(k3d::ViewportDesc(ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height));
+  renderCmd->SetPipelineState(0, m_pPso);
+  renderCmd->SetIndexBuffer(m_TriMesh->IBO());
+  renderCmd->SetVertexBuffer(0, m_TriMesh->VBO());
+  renderCmd->DrawIndexedInstanced(k3d::DrawIndexedInstancedParam(3, 1));
+  renderCmd->EndEncode();
+
+  commandBuffer->Present(m_pSwapChain, m_pFence);
+  commandBuffer->Commit(m_pFence);
+}
 ```
+
+> [RHI Objects were found here.](Document/ApiDifferences.md)
 
 ---
 

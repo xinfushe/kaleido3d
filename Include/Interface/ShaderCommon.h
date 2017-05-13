@@ -100,9 +100,11 @@ K3D_COMMON_NS
     ESampler = 0x1 << 1,
     ESampledImage = 0x1 << 2,
     ESamplerImageCombine = (ESampler | ESampledImage),
-    EStorageBuffer = 0x1 << 3,
-    EStorageImage = 0x1 << 4,
-    EConstants = 0x10
+    EStorageBuffer = 0x1 << 3,  // StructedBuffer
+    EStorageImage = 0x1 << 4,   // RWTexture(SRV)?
+    ETexelBuffer = 0x1 << 5,
+    ERWTexelBuffer = 0x1 << 6,  // RWTexture(UAV)
+    EConstants = 0x1 << 7
   };
 
   struct Attribute

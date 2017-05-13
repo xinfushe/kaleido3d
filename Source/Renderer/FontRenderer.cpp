@@ -98,12 +98,12 @@ namespace render
 		texDesc.TextureDesc.Layers = 1;
 		texDesc.TextureDesc.MipLevels = 1;
 		texDesc.TextureDesc.Depth = 1;
-		m_Texture = ::k3d::DynamicPointerCast<k3d::ITexture>(device->NewGpuResource(texDesc));
+		m_Texture = ::k3d::DynamicPointerCast<k3d::ITexture>(device->CreateResource(texDesc));
 
 		uint64 sz = m_Texture->GetSize();
 		void * pData = m_Texture->Map(0, sz);
 		k3d::SubResourceLayout layout = {};
-		k3d::TextureResourceSpec spec = { k3d::ETAF_COLOR,0,0 };
+		k3d::TextureSpec spec = { k3d::ETAF_COLOR,0,0 };
 		device->QueryTextureSubResourceLayout(m_Texture, spec, &layout);
 		if (quad.W * 4 == layout.RowPitch)
 		{
@@ -154,7 +154,7 @@ namespace render
 		vboDesc.ViewType = k3d::EGpuMemViewType::EGVT_VBV;
 		vboDesc.Flag = (k3d::EGpuResourceAccessFlag) (k3d::EGpuResourceAccessFlag::EGRAF_HostCoherent | k3d::EGpuResourceAccessFlag::EGRAF_HostVisible);
 		vboDesc.Size = sizeof(s_Vertices);
-		m_VertexBuffer = device->NewGpuResource(vboDesc);
+		m_VertexBuffer = device->CreateResource(vboDesc);
 		void * ptr = m_VertexBuffer->Map(0, vboDesc.Size);
 		memcpy(ptr, s_Vertices, vboDesc.Size);
 		m_VertexBuffer->UnMap();
@@ -163,7 +163,7 @@ namespace render
 		iboDesc.ViewType = k3d::EGpuMemViewType::EGVT_IBV;
 		iboDesc.Flag = (k3d::EGpuResourceAccessFlag) (k3d::EGpuResourceAccessFlag::EGRAF_HostCoherent | k3d::EGpuResourceAccessFlag::EGRAF_HostVisible);
 		iboDesc.Size = sizeof(s_Indices);
-		m_IndexBuffer = device->NewGpuResource(iboDesc);
+		m_IndexBuffer = device->CreateResource(iboDesc);
 		ptr = m_IndexBuffer->Map(0, iboDesc.Size);
 		memcpy(ptr, s_Indices, iboDesc.Size);
 		m_IndexBuffer->UnMap();

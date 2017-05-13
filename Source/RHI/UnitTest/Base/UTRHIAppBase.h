@@ -24,6 +24,13 @@
 using namespace k3d;
 using namespace kMath;
 
+struct MVPMatrix
+{
+  Mat4f projectionMatrix;
+  Mat4f modelMatrix;
+  Mat4f viewMatrix;
+};
+
 class RHIAppBase : public App
 {
 public:

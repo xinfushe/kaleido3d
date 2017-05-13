@@ -37,8 +37,17 @@ struct ITextureView;
 typedef ::k3d::SharedPtr<ITextureView> TextureViewRef;
 struct IBufferView;
 typedef ::k3d::SharedPtr<IBufferView> BufferViewRef;
+
+// buffer: texel buffer ReadOnly 
+// texture: sampled ReadOnly
 struct IShaderResourceView;
 typedef ::k3d::SharedPtr<IShaderResourceView> ShaderResourceViewRef;
+
+// buffer: RWBuffer, RWStructedBuffer,
+// texture: RWTexture
+struct IUnorderedAccessView;
+typedef ::k3d::SharedPtr<IUnorderedAccessView> UnorderedAccessViewRef;
+
 struct IPipelineState;
 typedef ::k3d::SharedPtr<IPipelineState> PipelineStateRef;
 struct IRenderPipelineState;
@@ -54,8 +63,8 @@ typedef ::k3d::SharedPtr<ISwapChain> SwapChainRef;
 struct ISampler;
 typedef ::k3d::SharedPtr<ISampler> SamplerRef;
 typedef const SamplerRef SamplerCRef;
-struct IDescriptor;
-typedef ::k3d::SharedPtr<IDescriptor> DescriptorRef;
+struct IBindingGroup;
+typedef ::k3d::SharedPtr<IBindingGroup> BindingGroupRef;
 struct IRenderTarget;
 typedef ::k3d::SharedPtr<IRenderTarget> RenderTargetRef;
 struct IRenderPass;
@@ -113,7 +122,7 @@ struct IShaderResourceView
 {
   virtual ~IShaderResourceView() {}
   virtual GpuResourceRef GetResource() const = 0;
-  virtual ResourceViewDesc GetDesc() const = 0;
+  virtual SRVDesc GetDesc() const = 0;
 };
 
 struct ITexture : public IGpuResource
@@ -130,12 +139,18 @@ struct IBuffer : public IGpuResource
   virtual ~IBuffer() {}
 };
 
-struct IDescriptor
+struct IUnorderedAccessView
+{
+  virtual ~IUnorderedAccessView() {}
+};
+
+struct IBindingGroup
 {
   virtual void Update(uint32 bindSet, GpuResourceRef) = 0;
+  virtual void Update(uint32 bindSet, UnorderedAccessViewRef) = 0;
   virtual void Update(uint32 bindSet, SamplerRef){};
   virtual uint32 GetSlotNum() const { return 0; }
-  virtual ~IDescriptor() {}
+  virtual ~IBindingGroup() {}
 };
 
 struct IDeviceAdapter
@@ -151,7 +166,7 @@ struct IDeviceAdapter
  */
 struct IPipelineLayout
 {
-  virtual DescriptorRef GetDescriptorSet() const = 0;
+  virtual BindingGroupRef ObtainBindingGroup() = 0;
   virtual ~IPipelineLayout() {}
 };
 
@@ -265,13 +280,16 @@ struct IDevice : public IObject
 
   virtual ~IDevice() {}
 
-  virtual GpuResourceRef NewGpuResource(ResourceDesc const&) = 0;
-  virtual ShaderResourceViewRef NewShaderResourceView(
+  virtual GpuResourceRef CreateResource(ResourceDesc const&) = 0;
+  virtual ShaderResourceViewRef CreateShaderResourceView(
     GpuResourceRef,
-    ResourceViewDesc const&) = 0;
-  virtual SamplerRef NewSampler(const SamplerState&) = 0;
+    SRVDesc const&) = 0;
 
-  virtual PipelineLayoutRef NewPipelineLayout(
+  virtual UnorderedAccessViewRef CreateUnorderedAccessView(GpuResourceRef, UAVDesc const&) = 0;
+
+  virtual SamplerRef CreateSampler(const SamplerState&) = 0;
+
+  virtual PipelineLayoutRef CreatePipelineLayout(
     PipelineLayoutDesc const& table) = 0;
   virtual SyncFenceRef CreateFence() = 0;
 
@@ -295,7 +313,7 @@ struct IDevice : public IObject
   /* equal with d3d12's getcopyfootprint or vulkan's getImagesubreslayout.
    */
   virtual void QueryTextureSubResourceLayout(TextureRef,
-                                             TextureResourceSpec const& spec,
+                                             TextureSpec const& spec,
                                              SubResourceLayout*)
   {
   }
@@ -381,7 +399,7 @@ struct ICommandBuffer : public IObject
 struct ICommandEncoder
 {
   virtual void SetPipelineState(uint32 HashCode, PipelineStateRef const&) = 0;
-  virtual void SetPipelineLayout(PipelineLayoutRef const&) = 0;
+  virtual void SetBindingGroup(BindingGroupRef const&) = 0;
   virtual void EndEncode() = 0;
 };
 

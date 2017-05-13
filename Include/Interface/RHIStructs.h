@@ -402,14 +402,20 @@ K3D_COMMON_NS
     uint32 MipLevels;
     uint32 Layers;
 
-    TextureDesc()
+    TextureDesc(
+      EPixelFormat _Format = EPF_RGBA8Unorm
+      , uint32 _Width = 0
+      , uint32 _Height = 0
+      , uint32 _Depth = 1
+      , uint32 _MipLevels = 1
+      , uint32 _Layers = 1)
+      : Format(_Format)
+      , Width(_Width)
+      , Height(_Height)
+      , Depth(_Depth)
+      , MipLevels(_MipLevels)
+      , Layers(_Layers)
     {
-      Format = EPixelFormat::EPF_RGBA8Unorm;
-      Width = 0;
-      Height = 0;
-      Depth = 0;
-      MipLevels = 0;
-      Layers = 0;
     }
 
     bool IsTex1D() const { return Depth == 1 && Layers == 1 && Height == 1; }
@@ -453,17 +459,47 @@ K3D_COMMON_NS
   };
 
   /*same as VkImageSubresource */
-  struct TextureResourceSpec
+  struct TextureSpec
   {
     ETextureAspectFlag Aspect;
     uint32 MipLevel;
     uint32 ArrayLayer;
   };
 
+  struct BufferSpec
+  {
+    uint64 FirstElement; // for vulkan, offset = FirstElement * StructureByteStride;
+    uint64 NumElements; // range = NumElements * StructureByteStride
+    uint64 StructureByteStride;
+  };
+
+  struct UAVDesc
+  {
+    EPixelFormat Format;
+    union
+    {
+      BufferSpec Buffer;
+      TextureSpec Texture;
+    };
+  };
+
+  struct SRVDesc
+  {
+    EPixelFormat Format;
+    union
+    {
+      BufferSpec Buffer;
+      TextureSpec Texture;
+    };
+  };
+
   struct ResourceViewDesc
   {
     EGpuMemViewType ViewType;
-    TextureResourceSpec TextureSpec;
+    union 
+    {
+      TextureSpec TextureSpec;
+    };
   };
   /**
    * Same as VkSubresourceLayout

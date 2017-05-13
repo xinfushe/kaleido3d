@@ -44,7 +44,7 @@ void TextureObject::CopyAndInitTexture(k3d::GpuResourceRef stageBuff)
 	texDesc.TextureDesc.Layers = 1;
 	texDesc.TextureDesc.MipLevels = 1;
 	texDesc.TextureDesc.Depth = 1;
-	m_Resource = m_pDevice->NewGpuResource(texDesc);
+	m_Resource = m_pDevice->CreateResource(texDesc);
   auto pQueue = m_pDevice->CreateCommandQueue(k3d::ECMD_Graphics);
   auto cmdBuf = pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
   cmdBuf->Transition(m_Resource, k3d::ERS_TransferDst);
@@ -109,12 +109,12 @@ void TextureObject::InitTexture()
 	texDesc.TextureDesc.Layers = 1;
 	texDesc.TextureDesc.MipLevels = 1;
 	texDesc.TextureDesc.Depth = 1;
-	m_Resource = m_pDevice->NewGpuResource(texDesc);
+	m_Resource = m_pDevice->CreateResource(texDesc);
 
 	uint64 sz = m_Resource->GetSize();
 	void * pData = m_Resource->Map(0, sz);
 	k3d::SubResourceLayout layout = {};
-	k3d::TextureResourceSpec spec = { k3d::ETAF_COLOR,0,0 };
+	k3d::TextureSpec spec = { k3d::ETAF_COLOR,0,0 };
 	m_pDevice->QueryTextureSubResourceLayout(k3d::StaticPointerCast<k3d::ITexture>(m_Resource), spec, &layout);
 	if (m_width * 4 == layout.RowPitch) // directly upload
 	{

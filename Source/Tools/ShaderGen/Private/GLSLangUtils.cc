@@ -98,7 +98,13 @@ k3d::shc::EDataType glslangDataTypeToRHIDataType(const glslang::TType & type)
 	using namespace k3d::shc;
 	switch (type.getBasicType()) {
 	case EbtSampler:
-		//return mapSamplerToGlType(type.getSampler());
+  {
+    switch (type.getQualifier().layoutFormat)
+    {
+    case ElfRgba32f:
+      return EDataType::EFloat4;
+    }
+  }
 	case EbtStruct:
 	case EbtBlock:
 	case EbtVoid:
@@ -354,6 +360,15 @@ void ExtractUniformData(k3d::EShaderType const& stype, const glslang::TProgram& 
 					bind = k3d::shc::EBindType::ESampledImage;
 					break;
 				}
+        switch (qualifier.storage)
+        {
+        case EvqUniform:
+          bind = k3d::shc::EBindType::ERWTexelBuffer;
+          break;
+        case EvqBuffer:
+          bind = k3d::shc::EBindType::ERWTexelBuffer;
+          break;
+        }
 			}
 			outUniformLayout.AddBinding({ bind, name, stype, qualifier.layoutBinding });
 		}

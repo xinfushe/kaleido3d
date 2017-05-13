@@ -35,6 +35,8 @@ class CommandBuffer;
 using SpCmdBuffer = SharedPtr<CommandBuffer>;
 
 class PipelineLayout;
+using SpPipelineLayout = SharedPtr<PipelineLayout>;
+
 class DescriptorAllocator;
 class DescriptorSetLayout;
 
@@ -64,9 +66,6 @@ using DescriptorAllocRef = SharedPtr<DescriptorAllocator>;
 class DescriptorSetLayout;
 using DescriptorSetLayoutRef = SharedPtr<DescriptorSetLayout>;
 
-class DescriptorSet;
-using DescriptorSetRef = SharedPtr<DescriptorSet>;
-
 class Instance;
 using InstanceRef = SharedPtr<Instance>;
 
@@ -77,14 +76,15 @@ typedef std::unordered_map<uint32, DescriptorSetLayoutRef>
   MapDescriptorSetLayout;
 typedef std::unordered_map<uint32, DescriptorAllocRef> MapDescriptorAlloc;
 
-template<class TVkResObj>
+template<class RHIObj>
 struct ResTrait
 {
 };
 
 template<>
-struct ResTrait<VkBuffer>
+struct ResTrait<k3d::IBuffer>
 {
+  typedef VkBuffer Obj;
   typedef VkBufferView View;
   typedef VkBufferUsageFlags UsageFlags;
   typedef VkBufferCreateInfo CreateInfo;
@@ -99,8 +99,9 @@ struct ResTrait<VkBuffer>
 };
 
 template<>
-struct ResTrait<VkImage>
+struct ResTrait<k3d::ITexture>
 {
+  typedef VkImage Obj;
   typedef VkImageView View;
   typedef VkImageUsageFlags UsageFlags;
   typedef VkImageCreateInfo CreateInfo;
@@ -364,15 +365,18 @@ public:
   ~Device() override;
   void Release() override;
 
-  k3d::GpuResourceRef NewGpuResource(k3d::ResourceDesc const&) override;
+  k3d::GpuResourceRef CreateResource(k3d::ResourceDesc const&) override;
 
-  k3d::ShaderResourceViewRef NewShaderResourceView(
+  k3d::ShaderResourceViewRef CreateShaderResourceView(
     k3d::GpuResourceRef,
-    k3d::ResourceViewDesc const&) override;
+    k3d::SRVDesc const&) override;
 
-  k3d::SamplerRef NewSampler(const k3d::SamplerState&) override;
+  k3d::UnorderedAccessViewRef CreateUnorderedAccessView(k3d::GpuResourceRef,
+    k3d::UAVDesc const&) override;
 
-  k3d::PipelineLayoutRef NewPipelineLayout(
+  k3d::SamplerRef CreateSampler(const k3d::SamplerState&) override;
+
+  k3d::PipelineLayoutRef CreatePipelineLayout(
     k3d::PipelineLayoutDesc const& table) override;
 
   k3d::RenderPassRef CreateRenderPass(k3d::RenderPassDesc const&) override;
@@ -393,7 +397,7 @@ public:
   void WaitIdle() override { vkDeviceWaitIdle(m_Device); }
 
   void QueryTextureSubResourceLayout(k3d::TextureRef,
-                                     k3d::TextureResourceSpec const& spec,
+                                     k3d::TextureSpec const& spec,
                                      k3d::SubResourceLayout*) override;
 
   VkDevice const& GetRawDevice() const { return m_Device; }
@@ -718,10 +722,13 @@ protected:
 
 private:
   friend class DescriptorSet;
+  friend class PipelineLayout;
 
   Options m_Options;
   VkDescriptorPool m_Pool;
 };
+
+using SpDescriptorAllocator = SharedPtr<DescriptorAllocator>;
 
 class DescriptorSetLayout : public DeviceChild
 {
@@ -741,50 +748,77 @@ protected:
 private:
   friend class PipelineLayout;
   VkDescriptorSetLayout m_DescriptorSetLayout;
-  std::vector<VkWriteDescriptorSet> m_UpdateDescSet;
 };
 
 class DescriptorSet
-  : public DeviceChild
-  , public k3d::IDescriptor
+  : public TVkRHIObjectBase<VkDescriptorSet, k3d::IBindingGroup>
 {
+  using Super = TVkRHIObjectBase<VkDescriptorSet, k3d::IBindingGroup>;
+  template<typename T>
+  friend class CommandEncoder;
 public:
-  static DescriptorSet* CreateDescSet(DescriptorAllocRef descriptorPool,
+  static DescriptorSet* CreateDescSet(SpPipelineLayout m_RootLayout,
                                       VkDescriptorSetLayout layout,
                                       BindingArray const& bindings,
                                       Device::Ptr pDevice);
   virtual ~DescriptorSet();
+  void Update(uint32 bindSet, k3d::UnorderedAccessViewRef) override;
   void Update(uint32 bindSet, k3d::SamplerRef) override;
   void Update(uint32 bindSet, k3d::GpuResourceRef) override;
   uint32 GetSlotNum() const override;
-  VkDescriptorSet GetNativeHandle() const { return m_DescriptorSet; }
 
 private:
-  DescriptorSet(DescriptorAllocRef descriptorPool,
+  SpPipelineLayout m_RootLayout;
+  BindingArray m_Bindings;
+  std::vector<VkWriteDescriptorSet> m_BoundDescriptorSet;
+
+private:
+  DescriptorSet(SpPipelineLayout m_RootLayout,
                 VkDescriptorSetLayout layout,
                 BindingArray const& bindings,
                 Device::Ptr pDevice);
-
-  VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE;
-  DescriptorAllocRef m_DescriptorAllocator = nullptr;
-  BindingArray m_Bindings;
-  std::vector<VkWriteDescriptorSet> m_BoundDescriptorSet;
 
   void Initialize(VkDescriptorSetLayout layout, BindingArray const& bindings);
   void Destroy();
 };
 
-template<class TVkResObj, class TRHIResObj>
-class TResource : public TVkRHIObjectBase<TVkResObj, TRHIResObj>
+class PipelineLayout
+  : public TVkRHIObjectBase<VkPipelineLayout, k3d::IPipelineLayout>
+  , public EnableSharedFromThis<PipelineLayout>
 {
 public:
-  using ThisResourceType = TResource<TVkResObj, TRHIResObj>;
-  using TVkRHIObjectBase<TVkResObj, TRHIResObj>::m_NativeObj;
-  using TVkRHIObjectBase<TVkResObj, TRHIResObj>::NativeDevice;
-  using TVkRHIObjectBase<TVkResObj, TRHIResObj>::m_Device;
+  PipelineLayout(Device::Ptr pDevice, k3d::PipelineLayoutDesc const& desc);
+  ~PipelineLayout() override;
+
+  k3d::BindingGroupRef ObtainBindingGroup() override;
+
+  VkDescriptorPool Pool() const
+  {
+    return m_DescAllocator->m_Pool;
+  }
+
+protected:
+  void InitWithDesc(k3d::PipelineLayoutDesc const& desc);
+  void Destroy();
+  friend class RenderPipelineState;
+
+private:
+  BindingArray m_BindingArray;
+  SpDescriptorAllocator m_DescAllocator;
+  DescriptorSetLayoutRef m_DescSetLayout;
+};
+
+template<class TRHIResObj>
+class TResource : public TVkRHIObjectBase<typename ResTrait<TRHIResObj>::Obj, TRHIResObj>
+{
+public:
+  using Super = TResource<TRHIResObj>;
+  using TVkRHIObjectBase<typename ResTrait<TRHIResObj>::Obj, TRHIResObj>::m_NativeObj;
+  using TVkRHIObjectBase<typename ResTrait<TRHIResObj>::Obj, TRHIResObj>::NativeDevice;
+  using TVkRHIObjectBase<typename ResTrait<TRHIResObj>::Obj, TRHIResObj>::m_Device;
 
   explicit TResource(VkDeviceRef const& refDevice, bool SelfOwned = true)
-    : TVkRHIObjectBase<TVkResObj, TRHIResObj>(refDevice)
+    : TVkRHIObjectBase<typename ResTrait<TRHIResObj>::Obj, TRHIResObj>(refDevice)
     , m_MemAllocInfo{}
     , m_HostMemAddr(nullptr)
     , m_DeviceMem{ VK_NULL_HANDLE }
@@ -795,7 +829,7 @@ public:
   }
 
   TResource(VkDeviceRef const& refDevice, k3d::ResourceDesc const& desc)
-    : TVkRHIObjectBase<TVkResObj, TRHIResObj>(refDevice)
+    : TVkRHIObjectBase<ResTrait<TRHIResObj>::Obj, TRHIResObj>(refDevice)
     , m_MemAllocInfo{}
     , m_HostMemAddr(nullptr)
     , m_DeviceMem{}
@@ -807,13 +841,13 @@ public:
   virtual ~TResource()
   {
     if (VK_NULL_HANDLE != m_ResView) {
-      ResTrait<TVkResObj>::DestroyView(NativeDevice(), m_ResView, nullptr);
+      ResTrait<TRHIResObj>::DestroyView(NativeDevice(), m_ResView, nullptr);
       VKLOG(Info, "TResourceView Destroying.. -- %p.", m_ResView);
       m_ResView = VK_NULL_HANDLE;
     }
     if (m_SelfOwned && VK_NULL_HANDLE != m_NativeObj) {
       VKLOG(Info, "TResource Destroying.. -- %p.", m_NativeObj);
-      ResTrait<TVkResObj>::Destroy(NativeDevice(), m_NativeObj, nullptr);
+      ResTrait<TRHIResObj>::Destroy(NativeDevice(), m_NativeObj, nullptr);
       m_NativeObj = VK_NULL_HANDLE;
     }
     if (VK_NULL_HANDLE != m_DeviceMem) {
@@ -839,18 +873,20 @@ public:
   virtual uint64 GetSize() const override { return m_MemAllocInfo.allocationSize; }
   k3d::ResourceDesc GetDesc() const override { return m_ResDesc; }
 
-  typedef typename ResTrait<TVkResObj>::CreateInfo CreateInfo;
-  typedef typename ResTrait<TVkResObj>::View ResourceView;
-  typedef typename ResTrait<TVkResObj>::DescriptorInfo ResourceDescriptorInfo;
-  typedef typename ResTrait<TVkResObj>::UsageFlags ResourceUsageFlags;
+  typedef typename ResTrait<TRHIResObj>::CreateInfo CreateInfo;
+  typedef typename ResTrait<TRHIResObj>::ViewCreateInfo ViewCreateInfo;
+  typedef typename ResTrait<TRHIResObj>::View ResourceView;
+  typedef typename ResTrait<TRHIResObj>::DescriptorInfo ResourceDescriptorInfo;
+  typedef typename ResTrait<TRHIResObj>::UsageFlags ResourceUsageFlags;
   ResourceView NativeView() const { return m_ResView; }
+  ResourceDescriptorInfo DescInfo() const { return m_ResDescInfo; }
 
 protected:
-
   VkMemoryAllocateInfo m_MemAllocInfo;
   VkMemoryRequirements m_MemReq;
   VkDeviceMemory m_DeviceMem;
   VkMemoryPropertyFlags m_MemoryBits = 0;
+  VkAccessFlagBits m_AccessMask = VK_ACCESS_FLAG_BITS_MAX_ENUM;
   void* m_HostMemAddr;
   ResourceView m_ResView;
   ResourceUsageFlags m_ResUsageFlags = 0;
@@ -861,11 +897,11 @@ protected:
 protected:
   void Allocate(CreateInfo const& info)
   {
-    K3D_VK_VERIFY(ResTrait<TVkResObj>::Create(
+    K3D_VK_VERIFY(ResTrait<TRHIResObj>::Create(
       NativeDevice(), &info, nullptr, &m_NativeObj));
     m_MemAllocInfo = {};
     m_MemAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    ResTrait<TVkResObj>::GetMemoryInfo(NativeDevice(), m_NativeObj, &m_MemReq);
+    ResTrait<TRHIResObj>::GetMemoryInfo(NativeDevice(), m_NativeObj, &m_MemReq);
 
     m_MemAllocInfo.allocationSize = m_MemReq.size;
     m_Device->FindMemoryType(
@@ -879,12 +915,12 @@ protected:
   }
 };
 
-class Buffer : public TResource<VkBuffer, k3d::IGpuResource>
+class Buffer : public TResource<k3d::IBuffer>
 {
 public:
   typedef Buffer* Ptr;
   explicit Buffer(Device::Ptr pDevice)
-    : ThisResourceType(pDevice)
+    : Super(pDevice)
   {
   }
   Buffer(Device::Ptr pDevice, k3d::ResourceDesc const& desc);
@@ -893,13 +929,13 @@ public:
   void Create(size_t size);
 };
 
-class Texture : public TResource<VkImage, k3d::ITexture>
+class Texture : public TResource<k3d::ITexture>
 {
 public:
   typedef ::k3d::SharedPtr<Texture> TextureRef;
 
   explicit Texture(Device::Ptr pDevice)
-    : ThisResourceType(pDevice)
+    : Super(pDevice)
   {
   }
   Texture(Device::Ptr pDevice, k3d::ResourceDesc const&);
@@ -930,16 +966,6 @@ public:
 private:
 
   void InitCreateInfos();
-
-  /**
-   * Create texture for Render
-   */
-  void CreateRenderTexture(k3d::TextureDesc const& desc);
-  void CreateDepthStencilTexture(k3d::TextureDesc const& desc);
-  /**
-   * Create texture for Sampler
-   */
-  void CreateSampledTexture(k3d::TextureDesc const& desc);
 
 private:
   ::k3d::SharedPtr<Sampler> m_ImageSampler;
@@ -1220,14 +1246,14 @@ public:
     }
   }
 
-  void SetPipelineLayout(k3d::PipelineLayoutRef const& pLayout) override
+  void SetBindingGroup(BindingGroupRef const& pBindingGroup) override
   {
-    K3D_ASSERT(pLayout);
-    auto pipelineLayout = StaticPointerCast<PipelineLayout>(pLayout);
-    VkDescriptorSet sets[] = { pipelineLayout->GetNativeDescriptorSet() };
+    K3D_ASSERT(pBindingGroup);
+    auto pDescSet = StaticPointerCast<DescriptorSet>(pBindingGroup);
+    VkDescriptorSet sets[] = { pDescSet->NativeHandle() };
     vkCmdBindDescriptorSets(m_MasterCmd->NativeHandle(),
                             GetBindPoint(),
-                            pipelineLayout->NativeHandle(),
+                            pDescSet->m_RootLayout->NativeHandle(),
                             0, // first set
                             1,
                             sets, // set count,
@@ -1418,6 +1444,7 @@ private:
   VkFramebuffer m_FrameBuffer = VK_NULL_HANDLE;
   uint32 m_Width = 0;
   uint32 m_Height = 0;
+  bool m_HasDepthStencil = false;
 };
 
 using PtrFrameBuffer = std::shared_ptr<FrameBuffer>;
@@ -1430,6 +1457,7 @@ public:
   RenderPass(Device::Ptr pDevice, k3d::RenderPassDesc const&);
 
   void Begin(VkCommandBuffer Cmd, SpFramebuffer pFramebuffer,
+    k3d::RenderPassDesc const& Desc,
     VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
   void End(VkCommandBuffer Cmd);
 
@@ -1568,45 +1596,20 @@ class ShaderResourceView
 {
 public:
   ShaderResourceView(Device::Ptr pDevice,
-                     k3d::ResourceViewDesc const& desc,
+                     k3d::SRVDesc const& desc,
                      k3d::GpuResourceRef gpuResource);
   ~ShaderResourceView() override;
   k3d::GpuResourceRef GetResource() const override
   {
     return k3d::GpuResourceRef(m_WeakResource);
   }
-  k3d::ResourceViewDesc GetDesc() const override { return m_Desc; }
+  k3d::SRVDesc GetDesc() const override { return m_Desc; }
   VkImageView NativeImageView() const { return m_NativeObj; }
 
 private:
-  // k3d::GpuResourceRef		m_Resource;
   WeakPtr<k3d::IGpuResource> m_WeakResource;
-  k3d::ResourceViewDesc m_Desc;
+  k3d::SRVDesc m_Desc;
   VkImageViewCreateInfo m_TextureViewInfo;
-};
-
-class PipelineLayout
-  : public TVkRHIObjectBase<VkPipelineLayout, k3d::IPipelineLayout>
-{
-public:
-  PipelineLayout(Device::Ptr pDevice, k3d::PipelineLayoutDesc const& desc);
-  ~PipelineLayout() override;
-
-  VkDescriptorSet GetNativeDescriptorSet() const
-  {
-    return static_cast<DescriptorSet*>(m_DescSet.Get())->GetNativeHandle();
-  }
-
-  k3d::DescriptorRef GetDescriptorSet() const override { return m_DescSet; }
-
-protected:
-  void InitWithDesc(k3d::PipelineLayoutDesc const& desc);
-  void Destroy();
-  friend class RenderPipelineState;
-
-private:
-  k3d::DescriptorRef m_DescSet;
-  DescriptorSetLayoutRef m_DescSetLayout;
 };
 
 class CommandAllocator;

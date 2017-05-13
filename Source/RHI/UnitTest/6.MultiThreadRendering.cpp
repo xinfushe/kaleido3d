@@ -15,13 +15,6 @@ using namespace kMath;
 
 class TriangleMesh;
 
-struct ConstantBuffer
-{
-  Mat4f projectionMatrix;
-  Mat4f modelMatrix;
-  Mat4f viewMatrix;
-};
-
 class MultiThreadRenderingApp : public RHIAppBase
 {
 public:
@@ -46,11 +39,8 @@ protected:
   void PrepareCommandBuffer();
 
 private:
-  IShCompiler::Ptr m_Compiler;
   std::unique_ptr<TriangleMesh> m_TriMesh;
-
   GpuResourceRef m_ConstBuffer;
-  ConstantBuffer m_HostBuffer;
 
   k3d::PipelineStateRef m_pPso;
   k3d::PipelineLayoutRef m_pl;
@@ -135,13 +125,13 @@ TriangleMesh::Upload()
   stageDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostCoherent |
     k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
   stageDesc.Size = m_szVBuf;
-  auto vStageBuf = m_pDevice->NewGpuResource(stageDesc);
+  auto vStageBuf = m_pDevice->CreateResource(stageDesc);
   void* ptr = vStageBuf->Map(0, m_szVBuf);
   memcpy(ptr, &m_VertexBuffer[0], m_szVBuf);
   vStageBuf->UnMap();
 
   stageDesc.Size = m_szIBuf;
-  auto iStageBuf = m_pDevice->NewGpuResource(stageDesc);
+  auto iStageBuf = m_pDevice->CreateResource(stageDesc);
   ptr = iStageBuf->Map(0, m_szIBuf);
   memcpy(ptr, &m_IndexBuffer[0], m_szIBuf);
   iStageBuf->UnMap();
@@ -151,21 +141,11 @@ TriangleMesh::Upload()
   bufferDesc.Size = m_szVBuf;
   bufferDesc.CreationFlag = k3d::EGpuResourceCreationFlag::EGRCF_TransferDst;
   bufferDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_DeviceVisible;
-  vbuf = m_pDevice->NewGpuResource(bufferDesc);
+  vbuf = m_pDevice->CreateResource(bufferDesc);
   bufferDesc.ViewType = k3d::EGpuMemViewType::EGVT_IBV;
   bufferDesc.Size = m_szIBuf;
-  ibuf = m_pDevice->NewGpuResource(bufferDesc);
-#if 0
-  auto cmd = m_pQueue->ObtainCommandBuffer(k3d::ECMD_Graphics);
-  k3d::CopyBufferRegion region = { 0, 0, m_szVBuf };
-  cmd->Begin();
-  cmd->CopyBuffer(*vbuf, *vStageBuf, region);
-  region.CopySize = m_szIBuf;
-  cmd->CopyBuffer(*ibuf, *iStageBuf, region);
-  cmd->End();
-  cmd->Execute(true);
-#endif
-  //	m_m_pDevice->WaitIdle();
+  ibuf = m_pDevice->CreateResource(bufferDesc);
+
   uint64 vboLoc = vbuf->GetLocation();
   uint64 iboLoc = ibuf->GetLocation();
   SetLoc(iboLoc, vboLoc);
@@ -198,10 +178,9 @@ MultiThreadRenderingApp::PrepareResource()
   k3d::ResourceDesc desc;
   desc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
   desc.ViewType = k3d::EGpuMemViewType::EGVT_CBV;
-  desc.Size = sizeof(ConstantBuffer);
-  m_ConstBuffer = m_pDevice->NewGpuResource(desc);
+  desc.Size = sizeof(MVPMatrix);
+  m_ConstBuffer = m_pDevice->CreateResource(desc);
   OnUpdate();
-  //	m_pDevice->WaitIdle(); TOFIX: this may cause crash on Android N
 }
 
 void
@@ -211,9 +190,9 @@ MultiThreadRenderingApp::PreparePipeline()
   Compile("asset://Test/triangle.vert", k3d::ES_Vertex, vertSh);
   Compile("asset://Test/triangle.frag", k3d::ES_Fragment, fragSh);
   k3d::PipelineLayoutDesc ppldesc = vertSh.BindingTable;
-  m_pl = m_pDevice->NewPipelineLayout(ppldesc);
+  m_pl = m_pDevice->CreatePipelineLayout(ppldesc);
   if (m_pl) {
-    auto descriptor = m_pl->GetDescriptorSet();
+    auto descriptor = m_pl->ObtainBindingGroup();
     descriptor->Update(0, m_ConstBuffer);
   }
   auto attrib = vertSh.Attributes;
@@ -267,7 +246,7 @@ MultiThreadRenderingApp::OnProcess(Message& msg)
   DynArray<SharedPtr<Os::Thread>> threadPool;
   threadPool.Append(MakeShared<Os::Thread>([=]() {
     auto subRenderCmd = parallelRenderCmd->SubRenderCommandEncoder();
-    subRenderCmd->SetPipelineLayout(m_pl);
+    // TODO subRenderCmd->SetBindingGroup();
     k3d::Rect rect{ 0,0,1920,1080 };
     subRenderCmd->SetScissorRect(rect);
     subRenderCmd->SetViewport(k3d::ViewportDesc(1920, 1080));
@@ -294,21 +273,22 @@ MultiThreadRenderingApp::OnProcess(Message& msg)
 void
 MultiThreadRenderingApp::OnUpdate()
 {
-  m_HostBuffer.projectionMatrix = Perspective(60.0f,
+  MVPMatrix* ptr = (MVPMatrix*)m_ConstBuffer->Map(0, sizeof(MVPMatrix));
+  auto & HostBuffer = *ptr;
+  HostBuffer.projectionMatrix = Perspective(60.0f,
     (float)1920 /
     (float)1080,
     0.1f,
     256.0f);
-  m_HostBuffer.viewMatrix =
+  HostBuffer.viewMatrix =
     Translate(Vec3f(0.0f, 0.0f, -2.5f), MakeIdentityMatrix<float>());
-  m_HostBuffer.modelMatrix = MakeIdentityMatrix<float>();
-  m_HostBuffer.modelMatrix =
-    Rotate(Vec3f(1.0f, 0.0f, 0.0f), 0.f, m_HostBuffer.modelMatrix);
-  m_HostBuffer.modelMatrix =
-    Rotate(Vec3f(0.0f, 1.0f, 0.0f), 0.f, m_HostBuffer.modelMatrix);
-  m_HostBuffer.modelMatrix =
-    Rotate(Vec3f(0.0f, 0.0f, 1.0f), 0.f, m_HostBuffer.modelMatrix);
-  void* ptr = m_ConstBuffer->Map(0, sizeof(ConstantBuffer));
-  memcpy(ptr, &m_HostBuffer, sizeof(ConstantBuffer));
+  HostBuffer.modelMatrix = MakeIdentityMatrix<float>();
+  HostBuffer.modelMatrix =
+    Rotate(Vec3f(1.0f, 0.0f, 0.0f), 0.f, HostBuffer.modelMatrix);
+  HostBuffer.modelMatrix =
+    Rotate(Vec3f(0.0f, 1.0f, 0.0f), 0.f, HostBuffer.modelMatrix);
+  HostBuffer.modelMatrix =
+    Rotate(Vec3f(0.0f, 0.0f, 1.0f), 0.f, HostBuffer.modelMatrix);
+
   m_ConstBuffer->UnMap();
 }

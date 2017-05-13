@@ -11,6 +11,12 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${Kaleido3D_SOURCE_DIR}/../Project")
 set(CMAKE_FIND_ROOT_PATH "${K3D_THIRD_PARTY};${CMAKE_FIND_ROOT_PATH}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${Kaleido3D_ROOT_DIR}/Binary/")
 
+if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
+	message(STATUS "Build 64Bit")
+else()
+	message(STATUS "Build 32Bit")
+endif()
+
 include(Util)
 include(Platform)
 include(Compiler)

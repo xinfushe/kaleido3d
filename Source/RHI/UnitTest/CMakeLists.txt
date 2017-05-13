@@ -25,6 +25,11 @@ add_unittest(
 )
 
 add_unittest(
+	RHI-UnitTest-3.TriangleWithDepthStencilAttachment
+	3.TriangleWithDepthStencilAttachment.cpp
+)
+
+add_unittest(
 	RHI-UnitTest-4.TexturedCube
 	4.TexturedCube.cpp
 	Base/TextureObject.h
@@ -32,10 +37,10 @@ add_unittest(
 )
 #target_link_libraries(RHI-UnitTest-4.TexturedCube ${STEAMSDK_LIBRARY})
 
-#add_unittest(
-#	RHI-UnitTest-5.ComputeParticles
-#	5.ComputeParticles.cpp
-#)
+add_unittest(
+	RHI-UnitTest-5.ComputeParticles
+	5.ComputeParticles.cpp
+)
 
 add_unittest(
 	RHI-UnitTest-6.MultiThreadRendering

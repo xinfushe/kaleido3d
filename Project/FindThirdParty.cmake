@@ -1,7 +1,11 @@
 message("ThirdParty includes vulkan, rapidjson, glslang, spirv2cross, freetype2. ")
 set(GIT_THIRDPARTY_REPO "https://github.com/Tomicyo/kaleido3d_dep_prebuilt")
 if(WIN32)
-	set(ThirdParty_PREBUILT_DIR ${K3D_THIRD_PARTY}/Win64/${CMAKE_BUILD_TYPE})
+    if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
+	   set(ThirdParty_PREBUILT_DIR ${K3D_THIRD_PARTY}/Win64/${CMAKE_BUILD_TYPE})
+    else()
+       set(ThirdParty_PREBUILT_DIR ${K3D_THIRD_PARTY}/Win32/${CMAKE_BUILD_TYPE})
+    endif()
     if(NOT (EXISTS ${ThirdParty_PREBUILT_DIR}))
         message(AUTHOR_WARNING "cloning ${ThirdParty_PREBUILT_DIR} from ${GIT_THIRDPARTY_REPO}")
         execute_process(COMMAND git clone ${GIT_THIRDPARTY_REPO} -b win64_${CMAKE_BUILD_TYPE} ${ThirdParty_PREBUILT_DIR})
@@ -55,7 +59,7 @@ endif()
 
 if(WIN32)
 find_library(VULKAN_LIB vulkan-1
-	PATH_SUFFIXES lib/x64
+	PATH_SUFFIXES lib
 	PATHS ${ThirdParty_PREBUILT_DIR})
 message(STATUS "** Vulkan \(Windows\) ** ${VULKAN_LIB}")
 elseif(ANDROID)
