@@ -244,7 +244,7 @@ UTComputeParticles::OnProcess(Message& msg)
   renderCmdBuffer->Commit();
 
   auto computeCmdBuffer = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
-  auto computeCmd = computeCmdBuffer->ComputeCommandEncoder(nullptr);
+  auto computeCmd = computeCmdBuffer->ComputeCommandEncoder();
   computeCmd->SetPipelineState(0, m_pCompPso);
   computeCmd->SetBindingGroup(m_CptBindingGroup);
   computeCmd->Dispatch(PARTICLE_COUNT, 1, 1);

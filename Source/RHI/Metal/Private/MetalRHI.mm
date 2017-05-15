@@ -4,11 +4,9 @@
 #include <vector>
 
 using namespace std;
-using namespace k3d;
-using namespace k3d::metal;
 
-namespace k3d
-{
+NS_K3D_METAL_BEGIN
+
 #if 0
     k3d::GpuResourceRef
     Device::NewGpuResource(k3d::ResourceDesc const& desc)
@@ -24,6 +22,9 @@ namespace k3d
         return nullptr;
     }
 #endif
+    
+#pragma mark Pipeline
+    
     MTLPrimitiveTopologyClass ConvertPrimTopology(k3d::EPrimitiveType const& type)
     {
         switch(type)
@@ -50,7 +51,7 @@ namespace k3d
         Finalize();
     }*/
     
-    RenderPipeline::RenderPipeline(SpDevice pDevice, k3d::RenderRenderPipelineDesc const & desc)
+    RenderPipeline::RenderPipeline(SpDevice pDevice, k3d::RenderPipelineStateDesc const & desc)
     : Super(pDevice)
     {
     }
@@ -60,7 +61,7 @@ namespace k3d
         
     }
     
-    void RenderPipeline::InitPSO(const k3d::RenderRenderPipelineDesc &desc)
+    void RenderPipeline::InitPSO(const k3d::RenderPipelineStateDesc &desc)
     {
         m_NativeDesc = [[MTLRenderPipelineDescriptor alloc] init];
             // depth stencil setup
@@ -129,8 +130,7 @@ namespace k3d
         //    m_ComputePipelineDesc = [[MTLComputePipelineDescriptor alloc] init];
     
         //    m_RenderPipelineDesc.
-        
-    }
+
     
     void RenderPipeline::AssignShader(const k3d::ShaderBundle &shaderBundle)
     {
@@ -201,129 +201,9 @@ namespace k3d
                 MTLLOGE("Failed to created render pipeline state, error: %s", [error.localizedDescription cStringUsingEncoding:NSASCIIStringEncoding]);
             }
     }
-    
-    MTLTextureType RHIMTLTextureType(k3d::EGpuResourceType const & type)
-    {
-        switch(type)
-        {
-            case k3d::EGT_Texture1D:
-                return MTLTextureType1D;
-            case k3d::EGT_Texture1DArray:
-                return MTLTextureType1DArray;
-            case k3d::EGT_Texture2D:
-                return MTLTextureType2D;
-            case k3d::EGT_Texture3D:
-                return MTLTextureType3D;
-            case k3d::EGT_Texture2DArray:
-                return MTLTextureType2DArray;
-        }
-        return MTLTextureType2D;
-    }
-    
-    MTLTextureUsage RHIMTLTexUsage(k3d::EGpuMemViewType const & viewType, k3d::EGpuResourceAccessFlag const & accessType)
-    {
-        MTLTextureUsage usage = MTLTextureUsageUnknown;
-        switch (viewType) {
-            case k3d::EGVT_SRV:
-                usage |= MTLTextureUsagePixelFormatView;
-                break;
-            case k3d::EGVT_RTV:
-                usage |= MTLTextureUsageRenderTarget;
-                break;
-            default:
-                break;
-        }
-        switch (accessType) {
-            case k3d::EGRAF_Read:
-                usage |= MTLTextureUsageShaderRead;
-                break;
-            case k3d::EGRAF_Write:
-                usage |= MTLTextureUsageShaderWrite;
-                break;
-            case k3d::EGRAF_ReadAndWrite:
-                usage |= (MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite);
-                break;
-            default:
-                break;
-        }
-        return usage;
-    }
-    
-    MTLTextureDescriptor * RHIMTLTexDesc(k3d::ResourceDesc const & desc)
-    {
-        MTLTextureDescriptor* texDesc = [MTLTextureDescriptor new];
-        texDesc.width = desc.TextureDesc.Width;
-        texDesc.height = desc.TextureDesc.Height;
-        texDesc.depth = desc.TextureDesc.Depth;
-        texDesc.pixelFormat = g_PixelFormat[desc.TextureDesc.Format];
-        texDesc.mipmapLevelCount = desc.TextureDesc.MipLevels;
-        texDesc.arrayLength = desc.TextureDesc.Layers;
-        texDesc.textureType = RHIMTLTextureType(desc.Type);
-        texDesc.usage = RHIMTLTexUsage(desc.ViewType, desc.Flag);
-        texDesc.resourceOptions;
-        texDesc.cpuCacheMode;
-        texDesc.storageMode;
-        return texDesc;
-    }
-    
-    Texture::Texture(Device * device, k3d::ResourceDesc const & desc)
-    : m_Device(device)
-    , m_Desc(desc)
-    , m_TexDesc(nil)
-    {
-        m_TexDesc = RHIMTLTexDesc(desc);
-        m_Tex = [m_Device->GetDevice() newTextureWithDescriptor:m_TexDesc];
-    }
-    
-    Texture::~Texture()
-    {
-    }
-    
-    void * Texture::Map(uint64 start, uint64 size)
-    {
-        return nullptr;
-    }
-    
-    void Texture::UnMap()
-    {
-        
-    }
-    
-    uint64 Texture::GetLocation() const
-    {
-        return 0;
-    }
-    
-    k3d::ResourceDesc Texture::GetDesc() const
-    {
-        return m_Desc;
-    }
-    
-    uint64 Texture::GetSize() const
-    {
-        return 0;
-    }
-    
-    k3d::SamplerCRef Texture::GetSampler() const
-    {
-        return nullptr;
-    }
-    
-    void Texture::BindSampler(k3d::SamplerRef)
-    {
-        
-    }
-    
-    void Texture::SetResourceView(k3d::ShaderResourceViewRef)
-    {
-        
-    }
-    
-    k3d::ShaderResourceViewRef
-    Texture::GetResourceView() const
-    {
-        return nullptr;
-    }
+
+#pragma mark Command
+
 #if 0
     CommandContext::CommandContext(k3d::ECommandType const & cmdType, id<MTLCommandBuffer> cmdBuf)
     : m_CommandType(cmdType)
@@ -468,6 +348,9 @@ namespace k3d
         [m_CmdBuffer commit];
     }
 #endif
+
+#pragma mark Resource
+
     Buffer::Buffer(Device* device, k3d::ResourceDesc const & desc)
     : m_Desc(desc)
     , m_Device(device)
@@ -519,40 +402,166 @@ namespace k3d
     {
         return m_Buf.length;
     }
+
+MTLTextureType RHIMTLTextureType(k3d::EGpuResourceType const & type)
+{
+    switch(type)
+    {
+        case k3d::EGT_Texture1D:
+            return MTLTextureType1D;
+        case k3d::EGT_Texture1DArray:
+            return MTLTextureType1DArray;
+        case k3d::EGT_Texture2D:
+            return MTLTextureType2D;
+        case k3d::EGT_Texture3D:
+            return MTLTextureType3D;
+        case k3d::EGT_Texture2DArray:
+            return MTLTextureType2DArray;
+    }
+    return MTLTextureType2D;
+}
+
+MTLTextureUsage RHIMTLTexUsage(k3d::EGpuMemViewType const & viewType, k3d::EGpuResourceAccessFlag const & accessType)
+{
+    MTLTextureUsage usage = MTLTextureUsageUnknown;
+    switch (viewType) {
+        case k3d::EGVT_SRV:
+            usage |= MTLTextureUsagePixelFormatView;
+            break;
+        case k3d::EGVT_RTV:
+            usage |= MTLTextureUsageRenderTarget;
+            break;
+        default:
+            break;
+    }
+    switch (accessType) {
+        case k3d::EGRAF_Read:
+            usage |= MTLTextureUsageShaderRead;
+            break;
+        case k3d::EGRAF_Write:
+            usage |= MTLTextureUsageShaderWrite;
+            break;
+        case k3d::EGRAF_ReadAndWrite:
+            usage |= (MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite);
+            break;
+        default:
+            break;
+    }
+    return usage;
+}
+
+MTLTextureDescriptor * RHIMTLTexDesc(k3d::ResourceDesc const & desc)
+{
+    MTLTextureDescriptor* texDesc = [MTLTextureDescriptor new];
+    texDesc.width = desc.TextureDesc.Width;
+    texDesc.height = desc.TextureDesc.Height;
+    texDesc.depth = desc.TextureDesc.Depth;
+    texDesc.pixelFormat = g_PixelFormat[desc.TextureDesc.Format];
+    texDesc.mipmapLevelCount = desc.TextureDesc.MipLevels;
+    texDesc.arrayLength = desc.TextureDesc.Layers;
+    texDesc.textureType = RHIMTLTextureType(desc.Type);
+    texDesc.usage = RHIMTLTexUsage(desc.ViewType, desc.Flag);
+    texDesc.resourceOptions;
+    texDesc.cpuCacheMode;
+    texDesc.storageMode;
+    return texDesc;
+}
+
+Texture::Texture(Device * device, k3d::ResourceDesc const & desc)
+: m_Device(device)
+, m_Desc(desc)
+, m_TexDesc(nil)
+{
+    m_TexDesc = RHIMTLTexDesc(desc);
+    m_Tex = [m_Device->GetDevice() newTextureWithDescriptor:m_TexDesc];
+}
+
+Texture::~Texture()
+{
+}
+
+void * Texture::Map(uint64 start, uint64 size)
+{
+    return nullptr;
+}
+
+void Texture::UnMap()
+{
     
+}
+
+uint64 Texture::GetLocation() const
+{
+    return 0;
+}
+
+k3d::ResourceDesc Texture::GetDesc() const
+{
+    return m_Desc;
+}
+
+uint64 Texture::GetSize() const
+{
+    return 0;
+}
+
+k3d::SamplerCRef Texture::GetSampler() const
+{
+    return nullptr;
+}
+
+void Texture::BindSampler(k3d::SamplerRef)
+{
+    
+}
+
+void Texture::SetResourceView(k3d::ShaderResourceViewRef)
+{
+    
+}
+
+k3d::ShaderResourceViewRef
+Texture::GetResourceView() const
+{
+    return nullptr;
+}
+
+
+#pragma mark Device
+
     Device::Device()
     {
     }
-    
+
     Device::Device(id<MTLDevice> pDevice) : m_Device(pDevice)
     {
     }
-    
+
     Device::~Device() {
     }
-    
+
     void Device::Release() {
         
     }
-    
+
     id<MTLDevice> Device::GetDevice() {
         return m_Device;
     }
-    
+
     k3d::ShaderResourceViewRef
-    Device::NewShaderResourceView(k3d::GpuResourceRef, const k3d::ResourceViewDesc &)
+    Device::CreateShaderResourceView(k3d::GpuResourceRef, const k3d::SRVDesc &)
     {
         return nullptr;
     }
-    
+
     k3d::SamplerRef
-    Device::NewSampler(const k3d::SamplerState&)
+    Device::CreateSampler(const k3d::SamplerState&)
     {
         return nullptr;
     }
 
     k3d::PipelineLayoutRef
-    Device::NewPipelineLayout(const k3d::PipelineLayoutDesc &table)
+    Device::CreatePipelineLayout(const k3d::PipelineLayoutDesc &table)
     {
         return nullptr;
     }
@@ -745,6 +754,8 @@ namespace k3d
         return nullptr;
     }
 #endif
+
+#pragma mark RenderTarget
     
     RenderTarget::RenderTarget(MTLRenderPassDescriptor* rpd, id<MTLTexture> color)
     : m_RenderPassDescriptor(rpd)
@@ -770,6 +781,7 @@ namespace k3d
     {
         return nullptr;
     }
+
 #if 0
     Library::Library(id<MTLDevice> device)
     : m_Device(device)
@@ -793,7 +805,10 @@ namespace k3d
         
     }
 #endif
-    class MetalRHI : public IMetalRHI
+
+NS_K3D_METAL_END
+
+class MetalRHI : public k3d::IMetalRHI
     {
     public:
         MetalRHI()
@@ -809,7 +824,7 @@ namespace k3d
             KLOG(Info, MetalRHI, "Starting...");
 #if K3DPLATFORM_OS_MAC
             NSArray<id<MTLDevice>> * deviceList = MTLCopyAllDevices();
-            m_Adapters.resize(deviceList.count);
+            
             MTLFeatureSet fSets[] = {
                 MTLFeatureSet_OSX_ReadWriteTextureTier2,
                 MTLFeatureSet_OSX_GPUFamily1_v2,
@@ -818,7 +833,7 @@ namespace k3d
             for (uint32 i = 0; i<deviceList.count; i++)
             {
                 id<MTLDevice> device = [deviceList objectAtIndex:i];
-                m_Adapters[i] = new metal::DeviceAdapter(device);
+                //m_Adapters[i] = new metal::DeviceAdapter(device);
                 KLOG(Info, MetalRHI, "DeviceName: %s ReadWriteTextureTier2:%d GPUv2:%d",
                       [[device name] UTF8String],
                       [device supportsFeatureSet:fSets[0]],
@@ -853,12 +868,10 @@ namespace k3d
         
         k3d::DeviceRef GetPrimaryDevice() override
         {
-            return m_Adapters[0]->GetDevice();
+            return nullptr;
         }
         
     private:
-        vector<metal::DeviceAdapter*> m_Adapters;
     };
-}
 
 MODULE_IMPLEMENT(RHI_Metal, MetalRHI)

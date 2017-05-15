@@ -8,7 +8,6 @@ Private/MetalRHI.h
 
 set(INCS
 Public/IMetalRHI.h
-Public/MetalRHIResource.h
 )
 
 source_group(Private FILES ${SRCS})

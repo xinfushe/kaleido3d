@@ -339,6 +339,7 @@ void ExtractUniformData(k3d::EShaderType const& stype, const glslang::TProgram& 
 		auto name = program.getUniformName(i);
 		auto index = program.getUniformIndex(name);
 		auto type = program.getUniformTType(index);
+    bool isImage = type->isImage();
 		auto baseType = type->getBasicType();
 		auto qualifier = type->getQualifier();
 		if (qualifier.hasBinding())
@@ -360,14 +361,17 @@ void ExtractUniformData(k3d::EShaderType const& stype, const glslang::TProgram& 
 					bind = k3d::shc::EBindType::ESampledImage;
 					break;
 				}
-        switch (qualifier.storage)
+        if (type->isImage())
         {
-        case EvqUniform:
-          bind = k3d::shc::EBindType::ERWTexelBuffer;
-          break;
-        case EvqBuffer:
-          bind = k3d::shc::EBindType::ERWTexelBuffer;
-          break;
+          switch (qualifier.storage)
+          {
+          case EvqUniform:
+            bind = k3d::shc::EBindType::ERWTexelBuffer;
+            break;
+          case EvqBuffer:
+            bind = k3d::shc::EBindType::ERWTexelBuffer;
+            break;
+          }
         }
 			}
 			outUniformLayout.AddBinding({ bind, name, stype, qualifier.layoutBinding });

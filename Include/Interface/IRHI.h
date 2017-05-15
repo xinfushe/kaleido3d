@@ -380,8 +380,7 @@ struct ICommandBuffer : public IObject
   virtual void Reset() = 0;
   virtual RenderCommandEncoderRef RenderCommandEncoder(
     RenderPassDesc const&) = 0;
-  virtual ComputeCommandEncoderRef ComputeCommandEncoder(
-    ComputePipelineStateRef) = 0;
+  virtual ComputeCommandEncoderRef ComputeCommandEncoder() = 0;
   virtual ParallelRenderCommandEncoderRef ParallelRenderCommandEncoder(
     RenderPassDesc const&) = 0;
   // blit

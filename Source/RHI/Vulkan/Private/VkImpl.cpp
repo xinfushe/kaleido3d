@@ -354,9 +354,9 @@ CommandBuffer::RenderCommandEncoder(k3d::RenderPassDesc const& Desc)
 }
 
 k3d::ComputeCommandEncoderRef
-CommandBuffer::ComputeCommandEncoder(k3d::ComputePipelineStateRef)
+CommandBuffer::ComputeCommandEncoder()
 {
-  return k3d::ComputeCommandEncoderRef();
+  return MakeShared<vk::ComputeCommandEncoder>(SharedFromThis());
 }
 
 k3d::ParallelRenderCommandEncoderRef
@@ -665,6 +665,11 @@ RenderCommandEncoder::RenderCommandEncoder(SpParallelCmdEncoder ParentEncoder,
   , m_Level(ECmdLevel::Secondary)
 {
   // render pass begun before allocate
+}
+
+ComputeCommandEncoder::ComputeCommandEncoder(SpCmdBuffer pCmdBuffer)
+  : Super(pCmdBuffer)
+{
 }
 
 void

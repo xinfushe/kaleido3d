@@ -20,8 +20,13 @@ using SpDevice = SharedPtr<Device>;
 class Factory : public k3d::IFactory
 {
 public:
-    
+    void EnumDevices(k3d::DynArray<k3d::DeviceRef>& Devices) override;
+    k3d::SwapChainRef CreateSwapchain(k3d::CommandQueueRef pCommandQueue,
+                                      void* nPtr,
+                                      k3d::SwapChainDesc&) override;
 };
+
+#pragma mark Device
 
 class Device : public k3d::IDevice, public EnableSharedFromThis<Device>
 {
@@ -31,16 +36,24 @@ public:
     
     Device();
     ~Device() override;
-    
+    // IObject::Release
     void Release() override;
-    
-    k3d::GpuResourceRef          NewGpuResource(k3d::ResourceDesc const&)override;
-    k3d::ShaderResourceViewRef	NewShaderResourceView(k3d::GpuResourceRef, k3d::ResourceViewDesc const&)override;
-    k3d::SamplerRef              NewSampler(const k3d::SamplerState&)override;
-    
-    k3d::PipelineLayoutRef		NewPipelineLayout(k3d::PipelineLayoutDesc const & table) override;
-    k3d::SyncFenceRef           CreateFence()override;
 
+    k3d::GpuResourceRef         CreateResource(k3d::ResourceDesc const&)override;
+    k3d::ShaderResourceViewRef	CreateShaderResourceView(k3d::GpuResourceRef, k3d::SRVDesc const&)override;
+    k3d::UnorderedAccessViewRef CreateUnorderedAccessView(k3d::GpuResourceRef, k3d::UAVDesc const&) override;
+    k3d::SamplerRef             CreateSampler(const k3d::SamplerState&)override;
+    k3d::PipelineLayoutRef		CreatePipelineLayout(k3d::PipelineLayoutDesc const & table) override;
+    k3d::SyncFenceRef           CreateFence()override;
+    k3d::RenderPassRef          CreateRenderPass(k3d::RenderPassDesc const&) override;
+    
+    k3d::PipelineStateRef       CreateRenderPipelineState(k3d::RenderPipelineStateDesc const&,
+                                                          k3d::PipelineLayoutRef,
+                                                          k3d::RenderPassRef) override;
+    k3d::PipelineStateRef       CreateComputePipelineState(k3d::ComputePipelineStateDesc const&,
+                                                           k3d::PipelineLayoutRef) override;
+    k3d::CommandQueueRef        CreateCommandQueue(k3d::ECommandType const&) override;
+    void                        WaitIdle() override;
     
     friend struct DeviceChild;
 private:
@@ -50,6 +63,9 @@ private:
     id <MTLCommandQueue>    m_CommandQueue;
     MTLFeatureSet           m_FeatureSet;
 };
+
+
+#pragma mark Command
 
 class CommandQueue : public k3d::ICommandQueue
 {
@@ -104,6 +120,8 @@ struct DeviceChild
     
     SpDevice Device;
 };
+
+#pragma mark Pipeline
 
 template <typename T>
 struct TPipelineType
@@ -178,10 +196,10 @@ private:
     //MTLComputePipelineReflection*   m_ComputeReflection;
 };
 
-class DescriptorSet : public k3d::IDescriptor
+class BindingGroup : public k3d::IBindingGroup
 {
 public:
-    DescriptorSet()
+    BindingGroup()
     {}
     
     void Update(uint32 bindSet, k3d::GpuResourceRef res) override;
@@ -194,43 +212,15 @@ class PipelineLayout : public k3d::IPipelineLayout
 {
 public:
     PipelineLayout(k3d::PipelineLayoutDesc const&);
-    ~PipelineLayout();
+    ~PipelineLayout() override;
     
-    k3d::DescriptorRef GetDescriptorSet() const override;
-    
+    k3d::BindingGroupRef ObtainBindingGroup() override;
+
 private:
     
 };
 
-class BufferRef
-{
-public:
-    BufferRef(id<MTLBuffer> iBuf)
-    : m_InterCnt(0)
-    , m_ExtCnt(0)
-    {
-        m_iBuffer = iBuf;
-    }
-    
-    ~BufferRef()
-    {
-    }
-    
-    void Retain()
-    {
-        
-    }
-    
-    void Release()
-    {
-        
-    }
-    
-private:
-    id<MTLBuffer> m_iBuffer;
-    int m_InterCnt;
-    int m_ExtCnt;
-};
+#pragma mark Resource
 
 class Buffer : public k3d::IGpuResource
 {

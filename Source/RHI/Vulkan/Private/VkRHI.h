@@ -1187,8 +1187,7 @@ public:
   void Reset() override;
   k3d::RenderCommandEncoderRef RenderCommandEncoder(
     RenderPassDesc const&) override;
-  k3d::ComputeCommandEncoderRef ComputeCommandEncoder(
-    k3d::ComputePipelineStateRef) override;
+  k3d::ComputeCommandEncoderRef ComputeCommandEncoder() override;
   k3d::ParallelRenderCommandEncoderRef ParallelRenderCommandEncoder(
     RenderPassDesc const&) override;
   void CopyTexture(const k3d::TextureCopyLocation& Dest,
@@ -1314,8 +1313,8 @@ private:
 using SpRenderCommandEncoder = SharedPtr<RenderCommandEncoder>;
 class ComputeCommandEncoder : public CommandEncoder<k3d::IComputeCommandEncoder>
 {
+  using Super = CommandEncoder<k3d::IComputeCommandEncoder>;
 public:
-  using This = CommandEncoder<k3d::IComputeCommandEncoder>;
   void Dispatch(uint32 GroupCountX,
                 uint32 GroupCountY,
                 uint32 GroupCountZ) override;
@@ -1326,6 +1325,8 @@ public:
   friend class CommandBuffer;
   template<typename T>
   friend class k3d::TRefCountInstance;
+private:
+  ComputeCommandEncoder(SpCmdBuffer pCmd);
 };
 
 class ParallelCommandEncoder
