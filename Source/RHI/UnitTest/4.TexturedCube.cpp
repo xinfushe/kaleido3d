@@ -31,7 +31,7 @@ public:
   }
 
   explicit TCubeUnitTest(kString const& appName)
-    : RHIAppBase(appName, 1920, 1080, true)
+    : RHIAppBase(appName, 1920, 1080)
   {
   }
 
@@ -265,7 +265,20 @@ TCubeUnitTest::PrepareResource()
   desc.ViewType = k3d::EGpuMemViewType::EGVT_CBV;
   desc.Size = sizeof(ConstantBuffer);
   m_ConstBuffer = m_pDevice->CreateResource(desc);
-  OnUpdate();
+  MVPMatrix* ptr = (MVPMatrix*)m_ConstBuffer->Map(0, sizeof(ConstantBuffer));
+  (*ptr).projectionMatrix = Perspective(60.0f, 1920.f / 1080.f, 0.1f, 256.0f);
+  (*ptr).viewMatrix = Translate(Vec3f(0.0f, 0.0f, -4.5f), MakeIdentityMatrix<float>());
+  (*ptr).modelMatrix = MakeIdentityMatrix<float>();
+  static auto angle = 60.f;
+#if K3DPLATFORM_OS_ANDROID
+  angle += 0.1f;
+#else
+  angle += 0.001f;
+#endif
+  (*ptr).modelMatrix = Rotate(Vec3f(1.0f, 0.0f, 0.0f), angle, (*ptr).modelMatrix);
+  (*ptr).modelMatrix = Rotate(Vec3f(0.0f, 1.0f, 0.0f), angle, (*ptr).modelMatrix);
+  (*ptr).modelMatrix = Rotate(Vec3f(0.0f, 0.0f, 1.0f), angle, (*ptr).modelMatrix);
+  m_ConstBuffer->UnMap();
 }
 
 void
@@ -317,6 +330,26 @@ TCubeUnitTest::OnDestroy()
 void
 TCubeUnitTest::OnProcess(Message& msg)
 {
+}
+
+void
+TCubeUnitTest::OnUpdate()
+{
+  MVPMatrix* ptr = (MVPMatrix*)m_ConstBuffer->Map(0, sizeof(ConstantBuffer));
+  (*ptr).projectionMatrix = Perspective(60.0f, 1920.f / 1080.f, 0.1f, 256.0f);
+  (*ptr).viewMatrix = Translate(Vec3f(0.0f, 0.0f, -4.5f), MakeIdentityMatrix<float>());
+  (*ptr).modelMatrix = MakeIdentityMatrix<float>();
+  static auto angle = 60.f;
+#if K3DPLATFORM_OS_ANDROID
+  angle += 0.1f;
+#else
+  angle += 0.001f;
+#endif
+  (*ptr).modelMatrix = Rotate(Vec3f(1.0f, 0.0f, 0.0f), angle, (*ptr).modelMatrix);
+  (*ptr).modelMatrix = Rotate(Vec3f(0.0f, 1.0f, 0.0f), angle, (*ptr).modelMatrix);
+  (*ptr).modelMatrix = Rotate(Vec3f(0.0f, 0.0f, 1.0f), angle, (*ptr).modelMatrix);
+  m_ConstBuffer->UnMap();
+
   auto currentImage = m_pSwapChain->GetCurrentTexture();
   auto ImageDesc = currentImage->GetDesc();
   k3d::ColorAttachmentDesc ColorAttach;
@@ -342,31 +375,4 @@ TCubeUnitTest::OnProcess(Message& msg)
 
   commandBuffer->Present(m_pSwapChain, m_pFence);
   commandBuffer->Commit(m_pFence);
-}
-
-void
-TCubeUnitTest::OnUpdate()
-{
-  //  ControllerHandle_t pHandles[STEAM_CONTROLLER_MAX_COUNT];
-  //  int nNumActive = SteamController()->GetConnectedControllers(pHandles);
-  m_HostBuffer.projectionMatrix =
-    Perspective(60.0f, 1920.f / 1080.f, 0.1f, 256.0f);
-  m_HostBuffer.viewMatrix =
-    Translate(Vec3f(0.0f, 0.0f, -4.5f), MakeIdentityMatrix<float>());
-  m_HostBuffer.modelMatrix = MakeIdentityMatrix<float>();
-  static auto angle = 60.f;
-#if K3DPLATFORM_OS_ANDROID
-  angle += 0.1f;
-#else
-  angle += 0.001f;
-#endif
-  m_HostBuffer.modelMatrix =
-    Rotate(Vec3f(1.0f, 0.0f, 0.0f), angle, m_HostBuffer.modelMatrix);
-  m_HostBuffer.modelMatrix =
-    Rotate(Vec3f(0.0f, 1.0f, 0.0f), angle, m_HostBuffer.modelMatrix);
-  m_HostBuffer.modelMatrix =
-    Rotate(Vec3f(0.0f, 0.0f, 1.0f), angle, m_HostBuffer.modelMatrix);
-  void* ptr = m_ConstBuffer->Map(0, sizeof(ConstantBuffer));
-  memcpy(ptr, &m_HostBuffer, sizeof(ConstantBuffer));
-  m_ConstBuffer->UnMap();
 }

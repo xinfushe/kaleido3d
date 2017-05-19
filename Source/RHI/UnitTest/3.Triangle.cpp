@@ -204,7 +204,21 @@ TriangleApp::PrepareResource()
   desc.ViewType = k3d::EGpuMemViewType::EGVT_CBV;
   desc.Size = sizeof(ConstantBuffer);
   m_ConstBuffer = m_pDevice->CreateResource(desc);
-  OnUpdate();
+
+  m_HostBuffer.projectionMatrix =
+    Perspective(60.0f, (float)1920 / (float)1080, 0.1f, 256.0f);
+  m_HostBuffer.viewMatrix =
+    Translate(Vec3f(0.0f, 0.0f, -2.5f), MakeIdentityMatrix<float>());
+  m_HostBuffer.modelMatrix = MakeIdentityMatrix<float>();
+  m_HostBuffer.modelMatrix =
+    Rotate(Vec3f(1.0f, 0.0f, 0.0f), 0.f, m_HostBuffer.modelMatrix);
+  m_HostBuffer.modelMatrix =
+    Rotate(Vec3f(0.0f, 1.0f, 0.0f), 0.f, m_HostBuffer.modelMatrix);
+  m_HostBuffer.modelMatrix =
+    Rotate(Vec3f(0.0f, 0.0f, 1.0f), 0.f, m_HostBuffer.modelMatrix);
+  void* ptr = m_ConstBuffer->Map(0, sizeof(ConstantBuffer));
+  memcpy(ptr, &m_HostBuffer, sizeof(ConstantBuffer));
+  m_ConstBuffer->UnMap();
 }
 
 void
@@ -259,6 +273,26 @@ TriangleApp::OnDestroy()
 void
 TriangleApp::OnProcess(Message& msg)
 {
+}
+
+void
+TriangleApp::OnUpdate()
+{
+  m_HostBuffer.projectionMatrix =
+    Perspective(60.0f, (float)1920 / (float)1080, 0.1f, 256.0f);
+  m_HostBuffer.viewMatrix =
+    Translate(Vec3f(0.0f, 0.0f, -2.5f), MakeIdentityMatrix<float>());
+  m_HostBuffer.modelMatrix = MakeIdentityMatrix<float>();
+  m_HostBuffer.modelMatrix =
+    Rotate(Vec3f(1.0f, 0.0f, 0.0f), 0.f, m_HostBuffer.modelMatrix);
+  m_HostBuffer.modelMatrix =
+    Rotate(Vec3f(0.0f, 1.0f, 0.0f), 0.f, m_HostBuffer.modelMatrix);
+  m_HostBuffer.modelMatrix =
+    Rotate(Vec3f(0.0f, 0.0f, 1.0f), 0.f, m_HostBuffer.modelMatrix);
+  void* ptr = m_ConstBuffer->Map(0, sizeof(ConstantBuffer));
+  memcpy(ptr, &m_HostBuffer, sizeof(ConstantBuffer));
+  m_ConstBuffer->UnMap();
+
   auto currentImage = m_pSwapChain->GetCurrentTexture();
   auto ImageDesc = currentImage->GetDesc();
   k3d::ColorAttachmentDesc ColorAttach;
@@ -284,24 +318,5 @@ TriangleApp::OnProcess(Message& msg)
 
   commandBuffer->Present(m_pSwapChain, m_pFence);
   commandBuffer->Commit(m_pFence);
-}
-
-void
-TriangleApp::OnUpdate()
-{
-  m_HostBuffer.projectionMatrix =
-    Perspective(60.0f, (float)1920 / (float)1080, 0.1f, 256.0f);
-  m_HostBuffer.viewMatrix =
-    Translate(Vec3f(0.0f, 0.0f, -2.5f), MakeIdentityMatrix<float>());
-  m_HostBuffer.modelMatrix = MakeIdentityMatrix<float>();
-  m_HostBuffer.modelMatrix =
-    Rotate(Vec3f(1.0f, 0.0f, 0.0f), 0.f, m_HostBuffer.modelMatrix);
-  m_HostBuffer.modelMatrix =
-    Rotate(Vec3f(0.0f, 1.0f, 0.0f), 0.f, m_HostBuffer.modelMatrix);
-  m_HostBuffer.modelMatrix =
-    Rotate(Vec3f(0.0f, 0.0f, 1.0f), 0.f, m_HostBuffer.modelMatrix);
-  void* ptr = m_ConstBuffer->Map(0, sizeof(ConstantBuffer));
-  memcpy(ptr, &m_HostBuffer, sizeof(ConstantBuffer));
-  m_ConstBuffer->UnMap();
 
 }

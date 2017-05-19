@@ -60,7 +60,7 @@ Current Status
 	
 	* [x] Triangle
 	* [x] Textured Cube
-	* [x] Compute Shader (WIP)
+	* [x] Compute Shader
 	* [ ] Physically Based Shading (Material Model)
 	* [ ] Skinned Skeleton Animation
 	* [ ] Shadow Mapping (Render To Texture, Z-Pass)
@@ -155,6 +155,10 @@ Samples
 ## 2.TexturedCube(Basic)
 
 ![Cube Screenshot](Document/images/sample_texturedcube_screenshot.png)
+
+## 3.Compute Particles(Intermediate)
+
+![Compute Sample](Document/images/sample_compute_particles.png)
 
 ---
 

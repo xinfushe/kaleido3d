@@ -47,6 +47,8 @@ Buffer::Buffer(Device::Ptr pDevice, k3d::ResourceDesc const& desc)
     m_ResUsageFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   }
 
+  m_ResUsageFlags |= VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+
   if (desc.Flag & k3d::EGRAF_HostVisible) {
     m_MemoryBits |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
   }
@@ -56,12 +58,16 @@ Buffer::Buffer(Device::Ptr pDevice, k3d::ResourceDesc const& desc)
   if (desc.Flag & k3d::EGRAF_HostCoherent) {
     m_MemoryBits |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   }
+  if (desc.ViewType == EGVT_VBV)
+  {
+    m_UsageState = ERS_VertexAndConstantBuffer;
+  }
   Create(desc.Size);
 }
 
 Buffer::~Buffer()
 {
-  VKLOG(Info, "Buffer Destroying..");
+  VKLOG(Info, ">>>>> Buffer Destroying.. 0x%0x.", m_NativeObj);
 }
 
 void
@@ -363,6 +369,42 @@ ShaderResourceView::~ShaderResourceView()
   if (m_NativeObj) {
     vkDestroyImageView(NativeDevice(), m_NativeObj, nullptr);
     m_NativeObj = VK_NULL_HANDLE;
+  }
+}
+
+UnorderedAceessView::UnorderedAceessView(Device::Ptr pDevice, k3d::UAVDesc const& Desc, const k3d::GpuResourceRef& pResource)
+  : m_pDevice(pDevice)
+  , m_Desc(Desc)
+{
+  switch (m_Desc.Dim)
+  {
+  case EVD_Buffer:
+  {
+    auto pBuffer = StaticPointerCast<const Buffer>(pResource);
+    VkBufferViewCreateInfo Info = {
+      VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO
+    };
+    Info.buffer = pBuffer->NativeHandle();
+    Info.offset = Desc.Buffer.FirstElement * Desc.Buffer.StructureByteStride;
+    Info.range = Desc.Buffer.NumElements * Desc.Buffer.StructureByteStride;
+    Info.format = g_FormatTable[Desc.Format];
+    Info.flags = 0;
+    K3D_VK_VERIFY(vkCreateBufferView(m_pDevice->GetRawDevice(), &Info, nullptr, &m_BufferView));
+    break;
+  }
+  }
+}
+
+UnorderedAceessView::~UnorderedAceessView()
+{
+  switch (m_Desc.Dim)
+  {
+  case EVD_Buffer:
+  {
+    VKLOG(Info, "UAV (Buffer) Destroyed . 0x%0x.", m_BufferView);
+    vkDestroyBufferView(m_pDevice->GetRawDevice(), m_BufferView, nullptr);
+    break;
+  }
   }
 }
 

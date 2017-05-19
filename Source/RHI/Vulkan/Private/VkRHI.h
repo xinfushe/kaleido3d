@@ -336,6 +336,7 @@ public:
   void BeginFrame();
 
 private:
+
   VkDevice m_Device = VK_NULL_HANDLE;
   VkCommandPool m_Pool = VK_NULL_HANDLE;
   DynArray<VkCommandBuffer> m_Buffers;
@@ -371,7 +372,7 @@ public:
     k3d::GpuResourceRef,
     k3d::SRVDesc const&) override;
 
-  k3d::UnorderedAccessViewRef CreateUnorderedAccessView(k3d::GpuResourceRef,
+  k3d::UnorderedAccessViewRef CreateUnorderedAccessView(const k3d::GpuResourceRef&,
     k3d::UAVDesc const&) override;
 
   k3d::SamplerRef CreateSampler(const k3d::SamplerState&) override;
@@ -811,6 +812,7 @@ private:
 template<class TRHIResObj>
 class TResource : public TVkRHIObjectBase<typename ResTrait<TRHIResObj>::Obj, TRHIResObj>
 {
+  friend class CommandBuffer;
 public:
   using Super = TResource<TRHIResObj>;
   using TVkRHIObjectBase<typename ResTrait<TRHIResObj>::Obj, TRHIResObj>::m_NativeObj;
@@ -840,24 +842,34 @@ public:
 
   virtual ~TResource()
   {
+    Release();
+  }
+
+  virtual void Release() override
+  {
     if (VK_NULL_HANDLE != m_ResView) {
       ResTrait<TRHIResObj>::DestroyView(NativeDevice(), m_ResView, nullptr);
-      VKLOG(Info, "TResourceView Destroying.. -- %p.", m_ResView);
+      VKLOG(Info, "TResourceView Destroying.. -- 0x%0x.", m_ResView);
       m_ResView = VK_NULL_HANDLE;
     }
     if (m_SelfOwned && VK_NULL_HANDLE != m_NativeObj) {
-      VKLOG(Info, "TResource Destroying.. -- %p.", m_NativeObj);
+      VKLOG(Info, "TResource Releasing.. 0x%0x. Name: %s.", m_NativeObj, m_Name.CStr());
       ResTrait<TRHIResObj>::Destroy(NativeDevice(), m_NativeObj, nullptr);
       m_NativeObj = VK_NULL_HANDLE;
     }
     if (VK_NULL_HANDLE != m_DeviceMem) {
       VKLOG(Info,
-            "TResource Freeing Memory. -- 0x%0x, tid:%d",
-            m_DeviceMem,
-            Os::Thread::GetId());
+        "TResource Freeing Memory. -- 0x%0x, tid:%d",
+        m_DeviceMem,
+        Os::Thread::GetId());
       vkFreeMemory(NativeDevice(), m_DeviceMem, nullptr);
       m_DeviceMem = VK_NULL_HANDLE;
     }
+  }
+
+  void SetName(const char* Name) override
+  {
+    m_Name = Name;
   }
 
   void* Map(uint64 offset, uint64 size) override
@@ -892,6 +904,8 @@ protected:
   ResourceUsageFlags m_ResUsageFlags = 0;
   ResourceDescriptorInfo m_ResDescInfo{};
   k3d::ResourceDesc m_ResDesc;
+  k3d::EResourceState m_UsageState = k3d::ERS_Unknown;
+  k3d::String m_Name;
   bool m_SelfOwned = true;
 
 protected:
@@ -951,7 +965,7 @@ public:
   k3d::SamplerCRef GetSampler() const override;
   k3d::ShaderResourceViewRef GetResourceView() const override { return m_SRV; }
   void SetResourceView(k3d::ShaderResourceViewRef srv) override { m_SRV = srv; }
-  k3d::EResourceState GetState() const override { return m_UsageState; }
+  k3d::EResourceState GetState() const override { return Super::m_UsageState; }
   
   VkImageLayout GetImageLayout() const { return m_ImageLayout; }
   VkImageSubresourceRange GetSubResourceRange() const { return m_SubResRange; }
@@ -961,7 +975,6 @@ public:
 
   friend class SwapChain;
   friend class CommandBuffer;
-  friend class CommandContext;
 
 private:
 
@@ -972,7 +985,6 @@ private:
   VkImageViewCreateInfo m_ImageViewInfo = {};
   k3d::ShaderResourceViewRef m_SRV;
   VkImageCreateInfo m_ImageInfo = {};
-  k3d::EResourceState m_UsageState = k3d::ERS_Unknown;
   VkImageLayout m_ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   VkImageMemoryBarrier m_Barrier;
 
@@ -1611,6 +1623,19 @@ private:
   WeakPtr<k3d::IGpuResource> m_WeakResource;
   k3d::SRVDesc m_Desc;
   VkImageViewCreateInfo m_TextureViewInfo;
+};
+
+class UnorderedAceessView : public k3d::IUnorderedAccessView
+{
+public:
+  UnorderedAceessView(Device::Ptr pDevice, k3d::UAVDesc const& Desc, const k3d::GpuResourceRef& pResource);
+  ~UnorderedAceessView() override;
+  friend class DescriptorSet;
+private:
+  Device::Ptr m_pDevice;
+  UAVDesc m_Desc;
+  VkImageView m_ImageView;
+  VkBufferView m_BufferView;
 };
 
 class CommandAllocator;

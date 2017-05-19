@@ -5,8 +5,7 @@
 #include <Core/Message.h>
 #include <Kaleido3D.h>
 #include <Math/kMath.hpp>
-
-#include <d3d12.h>
+#include <vector>
 
 using namespace k3d;
 using namespace kMath;
@@ -24,13 +23,9 @@ static inline float random_float()
   float res;
   unsigned int tmp;
   static unsigned int seed = 0xFFFF0C59;
-
   seed *= 16807;
-
   tmp = seed ^ (seed >> 4) ^ (seed << 15);
-
   *((unsigned int *)&res) = (tmp >> 9) | 0x3F800000;
-
   return (res - 1.0f);
 }
 static Vec3f random_vector(float minmag = 0.0f, float maxmag = 1.0f)
@@ -55,30 +50,25 @@ public:
   {
   }
 
+  ~UTComputeParticles() override 
+  {
+  }
+
   bool OnInit() override;
   void OnDestroy() override;
   void OnProcess(Message& msg) override;
-
   void OnUpdate() override;
 
-protected:
-  void PrepareResources();
-  void GenerateParticles();
-  void PreparePipeline();
-
 private:
-
-  float attractor_masses[MAX_ATTRACTORS];
+  float m_AttractorMasses[MAX_ATTRACTORS];
 
 private:
   k3d::PipelineStateRef m_pGfxPso;
   k3d::PipelineLayoutRef m_pGfxPl;
-
   k3d::BindingGroupRef m_GfxBindingGroup;
 
   k3d::PipelineStateRef m_pCompPso;
   k3d::PipelineLayoutRef m_pCompPl;
-
   k3d::BindingGroupRef m_CptBindingGroup;
 
   k3d::BufferRef m_PositionBuffer;
@@ -87,8 +77,11 @@ private:
   k3d::UnorderedAccessViewRef m_VelUAV;
   k3d::VertexBufferView m_PosVBV;
 
+  k3d::BufferRef m_AttractorMassBuffer;
+  k3d::BufferRef m_DtBuffer;
   k3d::GpuResourceRef m_MVPBuffer;
 
+  uint64 CurrentTick;
 private:
   k3d::VertexInputState m_IAState;
   k3d::RenderPassDesc m_RpDesc;
@@ -104,85 +97,105 @@ UTComputeParticles::OnInit()
   bool inited = RHIAppBase::OnInit();
   if (!inited)
     return inited;
-  PrepareResources();
-  PreparePipeline();
-  return true;
-}
+  CurrentTick = Os::GetTicks();
 
-#pragma region Initialize
+  // create buffers
+  auto PositionBuffer = AllocateVertexBuffer<Vec4f>([](Vec4f* Pointer)
+  {
+    std::vector<std::shared_ptr<std::thread>> threadPool;
+    // divide
+    int ThreadCount = 8;
+    int PerGroup = PARTICLE_COUNT / 8;
+    for (auto i = 0; i < ThreadCount; i++)
+    {
+      auto t = std::make_shared<std::thread>([=]() 
+      {
+        for (auto g = 0; g < PerGroup; g++)
+        {
+          float w = random_float();
+          Vec3f v = random_vector(-10.0f, 10.0f);
+          Pointer[g + i * PerGroup][0] = v.x;
+          Pointer[g + i * PerGroup][1] = v.y;
+          Pointer[g + i * PerGroup][2] = v.z;
+          Pointer[g + i * PerGroup][3] = w;
+        }
+      });
+      threadPool.push_back(t);
+    }
+    for (auto t : threadPool)
+    {
+      t->join();
+    }
+    KLOG(Info, App, "Particle generate finished, %s", Os::Thread::GetCurrentThreadName().CStr());
+  }, PARTICLE_COUNT);
+  m_PositionBuffer = StaticPointerCast<k3d::IBuffer>(PositionBuffer.second);
+  m_PositionBuffer->SetName("Position");
 
-void UTComputeParticles::PrepareResources()
-{
-  GenerateParticles();
+  auto VelocityBuffer = AllocateVertexBuffer<Vec4f>([](Vec4f* Pointer)
+  {
+    std::vector<std::shared_ptr<std::thread>> threadPool;
+    // divide
+    int ThreadCount = 8;
+    int PerGroup = PARTICLE_COUNT / 8;
+    for (auto i = 0; i < ThreadCount; i++)
+    {
+      auto t = std::make_shared<std::thread>([=]()
+      {
+        for (auto g = 0; g < PerGroup; g++)
+        {
+          Pointer[g + i * PerGroup] = Vec4f(random_vector(-0.1f, 0.1f), 0.0f);
+        }
+      });
+      threadPool.push_back(t);
+    }
+    for (auto t : threadPool)
+    {
+      t->join();
+    }
+    KLOG(Info, App, "velocity generate finished, %s", Os::Thread::GetCurrentThreadName().CStr());
+  }, PARTICLE_COUNT);
+  m_VelocityBuffer = StaticPointerCast<k3d::IBuffer>(VelocityBuffer.second);
+  m_VelocityBuffer->SetName("Velocity");
+
+  // create uavs
+  UAVDesc uavDesc = { EViewDimension::EVD_Buffer, EPixelFormat::EPF_RGBA32Float };
+  uavDesc.Buffer = { 0, PARTICLE_COUNT, sizeof(Vec4f) };
+  m_PosUAV = m_pDevice->CreateUnorderedAccessView(m_PositionBuffer, uavDesc);
+  m_VelUAV = m_pDevice->CreateUnorderedAccessView(m_VelocityBuffer, uavDesc);
+
+  // create constants
+  auto AttractorMassBuffer = AllocateConstBuffer<Vec4f>([this](Vec4f*Ptr)
+  {
+    for (uint32 i = 0; i < MAX_ATTRACTORS; i++)
+    {
+      m_AttractorMasses[i] = 0.5f + random_float() * 0.5f;
+    }
+  }, MAX_ATTRACTORS);
+  m_AttractorMassBuffer = StaticPointerCast<k3d::IBuffer>(AttractorMassBuffer);
+  m_AttractorMassBuffer->SetName("Attractor");
+
+  auto dt = AllocateConstBuffer<float>(1.0f);
+  m_DtBuffer = StaticPointerCast<k3d::IBuffer>(dt);
+  m_DtBuffer->SetName("Dt");
+
+  // create input state
   m_IAState.Attribs[0] = { k3d::EVF_Float4x32, 0, 0 };
-  m_IAState.Layouts[0] = { k3d::EVIR_PerVertex, sizeof(float)*4 };
+  m_IAState.Layouts[0] = { k3d::EVIR_PerVertex, sizeof(float) * 4 };
   m_PosVBV = { m_PositionBuffer->GetLocation(), 0, 0 };
 
+  // create MVP
   k3d::ResourceDesc desc;
   desc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
   desc.ViewType = k3d::EGpuMemViewType::EGVT_CBV;
   desc.Size = sizeof(MVPMatrix);
   m_MVPBuffer = m_pDevice->CreateResource(desc);
+  m_MVPBuffer->SetName("MVPMatrix");
 
-  MVPMatrix* pMatrix = (MVPMatrix*) m_MVPBuffer->Map(0, sizeof(MVPMatrix));
-  pMatrix->projectionMatrix =
-    Perspective(60.0f, 1920.f / 1080.f, 0.1f, 256.0f);
-  pMatrix->viewMatrix =
-    Translate(Vec3f(0.0f, 0.0f, -4.5f), MakeIdentityMatrix<float>());
-  pMatrix->modelMatrix = MakeIdentityMatrix<float>();
-  static auto angle = 60.f;
-#if K3DPLATFORM_OS_ANDROID
-  angle += 0.1f;
-#else
-  angle += 0.001f;
-#endif
-  pMatrix->modelMatrix =
-    Rotate(Vec3f(1.0f, 0.0f, 0.0f), angle, pMatrix->modelMatrix);
-  pMatrix->modelMatrix =
-    Rotate(Vec3f(0.0f, 1.0f, 0.0f), angle, pMatrix->modelMatrix);
-  pMatrix->modelMatrix =
-    Rotate(Vec3f(0.0f, 0.0f, 1.0f), angle, pMatrix->modelMatrix);
-  m_MVPBuffer->UnMap();
-
-}
-
-void UTComputeParticles::GenerateParticles()
-{
-  ResourceDesc Desc;
-  Desc.Type = EGT_Buffer;
-  Desc.ViewType = EGVT_VBV;
-  Desc.CreationFlag = EGRCF_Dynamic;
-  Desc.Flag = EGRAF_HostVisible;
-  Desc.Size = PARTICLE_COUNT * sizeof(Vec4f);
-  auto particleBuffer = m_pDevice->CreateResource(Desc);
-  auto Pointer = (Vec4f*)particleBuffer->Map(0, Desc.Size);
-  for (uint32 i = 0; i < PARTICLE_COUNT; i++)
-  {
-    Pointer[i] = Vec4f(random_vector(-10.0f, 10.0f), random_float());
-  }
-  particleBuffer->UnMap();
-  m_PositionBuffer = StaticPointerCast<k3d::IBuffer>(particleBuffer);
-
-  UAVDesc uavDesc;
-  m_PosUAV = m_pDevice->CreateUnorderedAccessView(m_PositionBuffer, uavDesc);
-
-  auto velocityBuffer = m_pDevice->CreateResource(Desc); 
-  Pointer = (Vec4f*)velocityBuffer->Map(0, Desc.Size);
-  for (uint32 i = 0; i < PARTICLE_COUNT; i++)
-  {
-    Pointer[i] = Vec4f(random_vector(-0.1f, 0.1f), 0.0f);
-  }
-  velocityBuffer->UnMap();
-  m_VelocityBuffer = StaticPointerCast<k3d::IBuffer>(velocityBuffer);
-}
-
-void
-UTComputeParticles::PreparePipeline()
-{
+  // compile shaders
   k3d::ShaderBundle vertSh, fragSh, compSh;
   Compile("asset://Test/particles.vert", k3d::ES_Vertex, vertSh);
   Compile("asset://Test/particles.frag", k3d::ES_Fragment, fragSh);
-  
+
   Compile("asset://Test/particles.comp", k3d::ES_Compute, compSh);
 
   auto vertBinding = vertSh.BindingTable;
@@ -196,13 +209,17 @@ UTComputeParticles::PreparePipeline()
   ColorAttach.pTexture = m_pSwapChain->GetCurrentTexture();
   ColorAttach.LoadAction = k3d::ELA_Clear;
   ColorAttach.StoreAction = k3d::ESA_Store;
-  ColorAttach.ClearColor = Vec4f(1, 1, 1, 1);
+  ColorAttach.ClearColor = Vec4f(0, 0, 0, 1);
 
   m_RpDesc.ColorAttachments.Append(ColorAttach);
   auto pRenderPass = m_pDevice->CreateRenderPass(m_RpDesc);
 
   k3d::RenderPipelineStateDesc renderPipelineDesc;
   renderPipelineDesc.AttachmentsBlend.Append(AttachmentState());
+  renderPipelineDesc.AttachmentsBlend[0].Blend.Enable = true;
+  renderPipelineDesc.AttachmentsBlend[0].Blend.Src = BlendState::EBlend::One;
+  renderPipelineDesc.AttachmentsBlend[0].Blend.Dest = BlendState::EBlend::One;
+  renderPipelineDesc.AttachmentsBlend[0].Blend.DestBlendAlpha = BlendState::EBlend::One;
   renderPipelineDesc.PrimitiveTopology = EPT_Points;
   renderPipelineDesc.InputState = m_IAState;
   renderPipelineDesc.VertexShader = vertSh;
@@ -211,45 +228,101 @@ UTComputeParticles::PreparePipeline()
 
   m_pCompPl = m_pDevice->CreatePipelineLayout(compSh.BindingTable);
   m_CptBindingGroup = m_pCompPl->ObtainBindingGroup();
-  m_CptBindingGroup->Update(0, StaticPointerCast<k3d::IGpuResource>(m_VelocityBuffer));
-  m_CptBindingGroup->Update(1, StaticPointerCast<k3d::IGpuResource>(m_PositionBuffer));
+  m_CptBindingGroup->Update(0, StaticPointerCast<k3d::IGpuResource>(m_AttractorMassBuffer));
+  m_CptBindingGroup->Update(1, StaticPointerCast<k3d::IGpuResource>(m_DtBuffer));
+  m_CptBindingGroup->Update(2, m_VelUAV);
+  m_CptBindingGroup->Update(3, m_PosUAV);
   k3d::ComputePipelineStateDesc computePipelineDesc;
   computePipelineDesc.ComputeShader = compSh;
   m_pCompPso = m_pDevice->CreateComputePipelineState(computePipelineDesc, m_pCompPl);
-}
 
-#pragma endregion
+  KLOG(Info, App, "pipeline creation finished, %s", Os::Thread::GetCurrentThreadName().CStr());
+  // wait vertex buffer upload
+  VelocityBuffer.first->join();
+  PositionBuffer.first->join();
+
+  return true;
+}
 
 void
 UTComputeParticles::OnUpdate()
-{
-}
-
-void
-UTComputeParticles::OnProcess(Message& msg)
 {
   auto currentImage = m_pSwapChain->GetCurrentTexture();
   auto ImageDesc = currentImage->GetDesc();
   m_RpDesc.ColorAttachments[0].pTexture = currentImage;
 
   auto renderCmdBuffer = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
-  renderCmdBuffer->Transition(m_PositionBuffer, k3d::ERS_Common);
   auto renderCmd = renderCmdBuffer->RenderCommandEncoder(m_RpDesc);
   renderCmd->SetBindingGroup(m_GfxBindingGroup);
+  k3d::Rect rect{ 0, 0, ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height };
+  renderCmd->SetScissorRect(rect);
+  renderCmd->SetViewport(k3d::ViewportDesc(ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height));
   renderCmd->SetPipelineState(0, m_pGfxPso);
   renderCmd->SetVertexBuffer(0, m_PosVBV);
   renderCmd->DrawInstanced(k3d::DrawInstancedParam(PARTICLE_COUNT, 1));
   renderCmd->EndEncode();
   renderCmdBuffer->Present(m_pSwapChain, nullptr);
-  renderCmdBuffer->Commit();
+  renderCmdBuffer->Commit(m_pFence);
+
+  static auto start_ticks = Os::GetTicks() - 100000;
+  auto current_ticks = Os::GetTicks() - CurrentTick;
+  static auto last_ticks = current_ticks;
+  float time = ((start_ticks - current_ticks) & 0xFFFFF) / float(0xFFFFF);
+  float delta_time = (float)(current_ticks - last_ticks) * 0.075f;
+
+  if (delta_time < 0.01f)
+  {
+    return;
+  }
+
+  MVPMatrix* pMatrix = (MVPMatrix*)m_MVPBuffer->Map(0, sizeof(MVPMatrix));
+  pMatrix->projectionMatrix =
+    Perspective(45.0f, 1920.f / 1080.f, 0.1f, 1000.0f);
+  pMatrix->viewMatrix =
+    Translate(Vec3f(0.0f, 0.0f, -160.f), MakeIdentityMatrix<float>());
+  pMatrix->modelMatrix = Rotate(Vec3f(0.0f, 1.0f, 0.0f), delta_time, MakeIdentityMatrix<float>());
+  m_MVPBuffer->UnMap();
+
+  Vec4f * attractors = (Vec4f*)m_AttractorMassBuffer->Map(0, sizeof(Vec4f) * 32);
+  for (uint32 i = 0; i < 32; i++)
+  {
+    attractors[i] = Vec4f(sinf(time * (float)(i + 4) * 7.5f * 20.0f) * 50.0f,
+      cosf(time * (float)(i + 7) * 3.9f * 20.0f) * 50.0f,
+      sinf(time * (float)(i + 3) * 5.3f * 20.0f) * cosf(time * (float)(i + 5) * 9.1f) * 100.0f,
+      m_AttractorMasses[i]);
+  }
+  m_AttractorMassBuffer->UnMap();
+
+  if (delta_time >= 2.0f)
+  {
+    delta_time = 2.0f;
+  }
+
+  float* pDt = (float*)m_DtBuffer->Map(0, sizeof(float));
+  *pDt = delta_time;
+  m_DtBuffer->UnMap();
 
   auto computeCmdBuffer = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
   auto computeCmd = computeCmdBuffer->ComputeCommandEncoder();
+  computeCmdBuffer->Transition(m_PositionBuffer, ERS_UnorderedAccess);
   computeCmd->SetPipelineState(0, m_pCompPso);
   computeCmd->SetBindingGroup(m_CptBindingGroup);
-  computeCmd->Dispatch(PARTICLE_COUNT, 1, 1);
+  computeCmd->Dispatch(PARTICLE_GROUP_COUNT, 1, 1);
+  computeCmdBuffer->Transition(m_PositionBuffer, ERS_VertexAndConstantBuffer);
   computeCmd->EndEncode();
-  computeCmdBuffer->Commit();
+  computeCmdBuffer->Commit(m_pFence);
+
+  last_ticks = current_ticks;
+}
+
+void
+UTComputeParticles::OnProcess(Message& msg)
+{
+  if (msg.type == Message::Resized)
+  {
+    KLOG(Info, App, "Resized.. %d, %d.", msg.size.width, msg.size.height);
+    m_pSwapChain->Resize(msg.size.width, msg.size.height);
+  }
 }
 
 void

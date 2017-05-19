@@ -142,6 +142,7 @@ enum EResourceState : uint8
   ERS_TransferSrc,
   ERS_RWDepthStencil,
   ERS_VertexAndConstantBuffer, // D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+  ERS_UnorderedAccess,
   ERS_Unknown,
   ERS_Num
 };
@@ -178,6 +179,15 @@ enum EGpuResourceType : uint8
   EGT_TextureCube,
   EGT_Buffer,
   ResourceTypeNum
+};
+
+enum EViewDimension : uint8
+{
+  EVD_Buffer,
+  EVD_Texture1D,
+  EVD_Texture2D,
+  EVD_Texture3D,
+  EVD_ViewDimensionNum
 };
 
 enum EGpuResourceAccessFlag : uint8

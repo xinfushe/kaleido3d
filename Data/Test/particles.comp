@@ -47,18 +47,18 @@ void main(void)
 
 #define blocksize 64
 
-groupshared float4 attractor[blocksize];
+cbuffer AttactorMasses : register(b0)
+{
+    float4 attractor[blocksize];
+};
 
-cbuffer cbCS : register(b0)
+cbuffer cbCS : register(b1)
 {
     float dt;
 };
 
-//RWStructuredBuffer<float4> velocity_buffer  : register(u0); // UAV
-//RWStructuredBuffer<float4> position_buffer  : register(u1); // UAV
-
-RWTexture1D <float4> velocity_buffer : register(u0);
-RWTexture1D <float4> position_buffer : register(u1);
+RWBuffer<float4> velocity_buffer : register(u2);
+RWBuffer<float4> position_buffer : register(u3);
 
 [numthreads(1024, 1, 1)]
 void main(
@@ -67,8 +67,8 @@ void main(
     uint3 GTid : SV_GroupThreadID, 
     uint GI : SV_GroupIndex)
 {
-    float4 vel = velocity_buffer.Load(DTid.x);
-    float4 pos = position_buffer.Load(DTid.x);
+    float4 vel = velocity_buffer[DTid.x];
+    float4 pos = position_buffer[DTid.x];
 
     int i;
 

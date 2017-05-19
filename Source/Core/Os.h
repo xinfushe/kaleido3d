@@ -131,6 +131,8 @@ GetCpuCoreNum();
 extern K3D_API float*
 GetCpuUsage();
 
+extern K3D_API uint64 GetTicks();
+
 enum class ThreadPriority
 {
   Low,

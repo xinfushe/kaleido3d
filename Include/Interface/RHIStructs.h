@@ -473,8 +473,14 @@ K3D_COMMON_NS
     uint64 StructureByteStride;
   };
 
+  /**
+   * Format
+   * BufferSpec(First, NumElement, Stride)
+   * TextureSpec
+   */
   struct UAVDesc
   {
+    EViewDimension Dim;
     EPixelFormat Format;
     union
     {
@@ -483,8 +489,12 @@ K3D_COMMON_NS
     };
   };
 
+  /**
+   * ReadOnly
+   */
   struct SRVDesc
   {
+    EViewDimension Dim;
     EPixelFormat Format;
     union
     {

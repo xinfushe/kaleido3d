@@ -464,6 +464,15 @@ MakeDir(const ::k3d::kchar* name)
 #endif
 }
 
+uint64 GetTicks()
+{
+#if K3DPLATFORM_OS_WIN
+  return ::GetTickCount64();
+#else
+  return 0UL;
+#endif
+}
+
 bool
 Exists(const ::k3d::kchar* name)
 {
@@ -811,8 +820,8 @@ Thread::Thread()
 }
 
 Thread::Thread(Call&& callback,
-               k3d::String const& name,
-               ThreadPriority priority)
+  k3d::String const& name,
+  ThreadPriority priority)
   : m_ThreadCallBack(std::forward<Call>(callback))
   , m_ThreadName(name)
   , m_ThreadPriority(priority)
@@ -824,6 +833,16 @@ Thread::Thread(Call&& callback,
 
 Thread::~Thread()
 {
+  if (m_ThreadHandle)
+  {
+#if defined(K3DPLATFORM_OS_WIN)
+    uint32 Tid = ::GetThreadId(m_ThreadHandle);
+    if (s_ThreadMap.find(Tid) != s_ThreadMap.end())
+    {
+      s_ThreadMap.erase(Tid);
+    }
+#endif
+  }
 }
 
 void
@@ -847,6 +866,7 @@ Thread::Start()
     {
       Mutex::AutoLock lock;
       DWORD tid = ::GetThreadId(m_ThreadHandle);
+      m_ThreadName.AppendSprintf(" #%d", tid);
       s_ThreadMap[tid] = this;
     }
   }
@@ -909,7 +929,7 @@ Thread::GetCurrentThreadName()
     return s_ThreadMap[tid]->GetName();
   }
 
-  return "Anonymous Thread";
+  return "Main";
 #elif K3DPLATFORM_OS_ANDROID
   char name[32];
   prctl(PR_GET_NAME, (unsigned long)name);

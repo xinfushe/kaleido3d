@@ -4,6 +4,7 @@
 #include <Core/App.h>
 #include <Core/AssetManager.h>
 #include <Core/LogUtil.h>
+#include <Core/Os.h>
 #include <Core/Message.h>
 #include <Interface/IRHI.h>
 #include <rapidjson/rapidjson.h>
@@ -45,7 +46,9 @@ public:
   {
   }
 
-  virtual ~RHIAppBase() override {}
+  virtual ~RHIAppBase() override 
+  {
+  }
 
   virtual bool OnInit() override
   {
@@ -63,6 +66,74 @@ public:
                k3d::EShaderType const& type,
                k3d::ShaderBundle& shader);
 
+
+  template <typename ElementT>
+  GpuResourceRef AllocateConstBuffer(std::function<void(ElementT*ptr)> InitFunction, uint64 Count)
+  {
+    ResourceDesc desc;
+    desc.Type = EGT_Buffer;
+    desc.Flag = EGRAF_HostVisible | EGRAF_HostCoherent;
+    desc.ViewType = EGVT_CBV;
+    desc.Size = Count * sizeof(ElementT);
+    auto pResource = m_pDevice->CreateResource(desc);
+    ElementT* ptr = (ElementT*)pResource->Map(0, sizeof(ElementT) * Count);
+    InitFunction(ptr);
+    pResource->UnMap();
+    return pResource;
+  }
+
+
+  template <typename ElementT>
+  GpuResourceRef AllocateConstBuffer(ElementT Value)
+  {
+    ResourceDesc desc;
+    desc.Type = EGT_Buffer;
+    desc.Flag = EGRAF_HostVisible | EGRAF_HostCoherent;
+    desc.ViewType = EGVT_CBV;
+    desc.Size = sizeof(ElementT);
+    auto pResource = m_pDevice->CreateResource(desc);
+    ElementT* ptr = (ElementT*)pResource->Map(0, sizeof(ElementT));
+    *ptr = Value;
+    pResource->UnMap();
+    return pResource;
+  }
+
+  using Thread = std::thread;
+  typedef SharedPtr<Thread> ThreadPtr;
+  typedef std::pair<ThreadPtr, GpuResourceRef> AsyncResourceRef;
+  /**
+   * Async Load Buffers
+   */
+  template <typename VertexElementT>
+  AsyncResourceRef AllocateVertexBuffer(std::function<void(VertexElementT *ptr)> InitFunction, uint64 Count)
+  {
+    ResourceDesc Desc;
+    Desc.Type = EGT_Buffer;
+    Desc.ViewType = EGVT_VBV;
+    Desc.Flag = EGRAF_DeviceVisible;
+    Desc.CreationFlag = EGRCF_TransferDst;
+    Desc.Size = Count * sizeof(VertexElementT);
+    auto pDevice = m_pDevice;
+    auto pQueue = m_pQueue;
+    auto DeviceBuffer = m_pDevice->CreateResource(Desc);
+    auto UploadThread = MakeShared<Thread>([=]() {
+      ResourceDesc HostDesc;
+      HostDesc.ViewType = EGVT_Undefined;
+      HostDesc.Flag = EGRAF_HostVisible;
+      HostDesc.Size = Count * sizeof(VertexElementT);
+      HostDesc.CreationFlag = EGRCF_TransferSrc;
+      auto HostBuffer = pDevice->CreateResource(HostDesc);
+      VertexElementT* Ptr = (VertexElementT*)HostBuffer->Map(0, Count * sizeof(VertexElementT));
+      InitFunction(Ptr);
+      HostBuffer->UnMap();
+      auto copyCmd = pQueue->ObtainCommandBuffer(ECMDUsage_OneShot);
+      copyCmd->CopyBuffer(DeviceBuffer, HostBuffer, CopyBufferRegion{ 0, 0, HostDesc.Size });
+      copyCmd->Commit();
+    }/*, "VertexUploadThread"*/);
+    //UploadThread->Start();
+    return std::make_pair(UploadThread, (DeviceBuffer));
+  }
+
 protected:
   SharedPtr<k3d::IShModule> m_ShaderModule;
   k3d::IShCompiler::Ptr m_RHICompiler;
@@ -73,6 +144,8 @@ protected:
   k3d::CommandQueueRef m_pQueue;
   k3d::SwapChainRef m_pSwapChain;
   
+  k3d::SyncFenceRef m_pFence;
+
   uint32 m_Width;
   uint32 m_Height;
 
@@ -83,7 +156,7 @@ private:
   void InitializeRHIObjects();
 
 private:
-  k3d::SwapChainDesc m_SwapChainDesc = { k3d::EPF_RGBA8Unorm,
+  k3d::SwapChainDesc m_SwapChainDesc = { k3d::EPF_RGBA8Unorm_sRGB,
                                          m_Width,
                                          m_Height,
                                          2 };
@@ -160,7 +233,7 @@ RHIAppBase::InitializeRHIObjects()
   m_pQueue = m_pDevice->CreateCommandQueue(k3d::ECMD_Graphics);
   m_pSwapChain = m_pFactory->CreateSwapchain(
     m_pQueue, HostWindow()->GetHandle(), m_SwapChainDesc);
-
+  m_pFence = m_pDevice->CreateFence();
   auto cmd = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
 }
 

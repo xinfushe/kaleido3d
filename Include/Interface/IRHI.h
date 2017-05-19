@@ -9,6 +9,7 @@ K3D_COMMON_NS
 {
 struct IObject
 {
+  virtual void SetName(const char*) {}
   virtual void Release() = 0;
 };
 struct ICommandQueue;
@@ -94,7 +95,7 @@ typedef ::k3d::SharedPtr<ISyncFence> SyncFenceRef;
 struct IPipelineLayout;
 typedef ::k3d::SharedPtr<IPipelineLayout> PipelineLayoutRef;
 
-struct IGpuResource
+struct IGpuResource : public IObject
 {
   virtual ~IGpuResource() {}
   virtual void* Map(uint64 start, uint64 size) = 0;
@@ -285,7 +286,7 @@ struct IDevice : public IObject
     GpuResourceRef,
     SRVDesc const&) = 0;
 
-  virtual UnorderedAccessViewRef CreateUnorderedAccessView(GpuResourceRef, UAVDesc const&) = 0;
+  virtual UnorderedAccessViewRef CreateUnorderedAccessView(const GpuResourceRef&, UAVDesc const&) = 0;
 
   virtual SamplerRef CreateSampler(const SamplerState&) = 0;
 

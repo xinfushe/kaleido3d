@@ -156,11 +156,17 @@ CommandQueue::~CommandQueue()
   Destroy();
 }
 
+#pragma region ThreadLocalCommandBufferManager
+thread_local CmdBufManagerRef TLS_CmdManager;
+#pragma endregion
 k3d::CommandBufferRef
 CommandQueue::ObtainCommandBuffer(k3d::ECommandUsageType const& Usage)
 {
-  VkCommandBuffer Cmd = m_ReUsableCmdBufferPool->RequestCommandBuffer();
-  m_ReUsableCmdBufferPool->BeginFrame();
+  if (!TLS_CmdManager)
+    TLS_CmdManager = MakeShared<CommandBufferManager>(
+      m_Device->GetRawDevice(), VK_COMMAND_BUFFER_LEVEL_PRIMARY, m_QueueIndex);
+  VkCommandBuffer Cmd = TLS_CmdManager->RequestCommandBuffer();
+  TLS_CmdManager->BeginFrame();
   return MakeShared<CommandBuffer>(m_Device, SharedFromThis(), Cmd);
 }
 
@@ -186,6 +192,8 @@ CommandQueue::Submit(const std::vector<VkCommandBuffer>& cmdBufs,
     signalSemaphores.empty() ? nullptr : signalSemaphores.data();
   this->Submit({ submits }, fence);
 }
+
+
 
 SpCmdBuffer
 CommandQueue::ObtainSecondaryCommandBuffer()
@@ -495,21 +503,37 @@ CommandBuffer::Transition(k3d::GpuResourceRef pResource,
     auto pBuffer = StaticPointerCast<Buffer>(pResource);
     BufferBarrier.buffer = pBuffer->NativeHandle();
     BufferBarrier.size = pBuffer->GetSize();
-    BufferBarrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;			// Vertex shader invocations have finished reading from the buffer
-    BufferBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;								// Compute shader wants to write to the buffer
-                                                                            // Transfer ownership if compute and graphics queue familiy indices differ
-    //BufferBarrier.srcQueueFamilyIndex = vulkanDevice->queueFamilyIndices.graphics;
-    //BufferBarrier.dstQueueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
 
+    VkPipelineStageFlagBits SrcStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+    VkPipelineStageFlagBits DestStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    if (pBuffer->m_UsageState == ERS_VertexAndConstantBuffer)
+    {
+      BufferBarrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+    }
+    if (pBuffer->m_UsageState == ERS_UnorderedAccess)
+    {
+      BufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+      SrcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    }
+    if (State == ERS_UnorderedAccess)
+    {
+      BufferBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    }
+    if (State == ERS_VertexAndConstantBuffer)
+    {
+      BufferBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+      DestStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+    }
+    BufferBarrier.srcQueueFamilyIndex = 0;
+    BufferBarrier.dstQueueFamilyIndex = 0;
     vkCmdPipelineBarrier(
       m_NativeObj,
-      VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      SrcStage,
+      DestStage,
       0,
       0, nullptr,
       1, &BufferBarrier,
       0, nullptr);
-
   } else if(State != ERS_VertexAndConstantBuffer)// ImageLayout Transition
   {
     //if (pResource->GetState() == State)
@@ -1028,6 +1052,12 @@ RenderPipelineState::InitWithDesc(k3d::RenderPipelineStateDesc const& desc)
   AttachmentStates.Resize(desc.AttachmentsBlend.Count());
   for (auto i = 0; i< desc.AttachmentsBlend.Count(); i++)
   {
+    AttachmentStates[i].alphaBlendOp = g_BlendOps[desc.AttachmentsBlend[i].Blend.BlendAlphaOp];
+    AttachmentStates[i].colorBlendOp = g_BlendOps[desc.AttachmentsBlend[i].Blend.Op];
+    AttachmentStates[i].srcColorBlendFactor = g_Blend[desc.AttachmentsBlend[i].Blend.Src];
+    AttachmentStates[i].dstColorBlendFactor = g_Blend[desc.AttachmentsBlend[i].Blend.Dest];
+    AttachmentStates[i].srcAlphaBlendFactor = g_Blend[desc.AttachmentsBlend[i].Blend.SrcBlendAlpha];
+    AttachmentStates[i].dstAlphaBlendFactor = g_Blend[desc.AttachmentsBlend[i].Blend.DestBlendAlpha];
     AttachmentStates[i].colorWriteMask = desc.AttachmentsBlend[i].Blend.ColorWriteMask;
     AttachmentStates[i].blendEnable = desc.AttachmentsBlend[i].Blend.Enable? VK_TRUE : VK_FALSE;
   }
@@ -1388,8 +1418,18 @@ DescriptorSet::~DescriptorSet()
   Destroy();
 }
 
-void DescriptorSet::Update(uint32 bindSet, k3d::UnorderedAccessViewRef)
+void DescriptorSet::Update(uint32 bindSet, k3d::UnorderedAccessViewRef pUAV)
 {
+  auto uav = StaticPointerCast<UnorderedAceessView>(pUAV);
+  m_BoundDescriptorSet[bindSet].pTexelBufferView = &uav->m_BufferView;
+//  m_BoundDescriptorSet[bindSet]. = &imageInfo;
+  vkUpdateDescriptorSets(
+    NativeDevice(), 1, &m_BoundDescriptorSet[bindSet], 0, NULL);
+  VKLOG(Info,
+    "%s , Set (0x%0x) updated with uav(view location:0x%x).",
+    __K3D_FUNC__,
+    NativeHandle(),
+    uav->m_BufferView);
 }
 
 void
@@ -1508,6 +1548,7 @@ DescriptorSet::Destroy()
 {
   if (VK_NULL_HANDLE == m_NativeObj)
     return;
+  VKLOG(Info, "BindingGroup :: Destroy 0x%0x.", m_NativeObj);
   // const auto& options = m_DescriptorAllocator->m_Options;
   // if( options.hasFreeDescriptorSetFlag() ) {
   VkDescriptorSet descSets[1] = { m_NativeObj };
@@ -1638,6 +1679,7 @@ void
 RenderPass::Release()
 {
   if (m_NativeObj) {
+    VKLOG(Info, "RenderPass Destroyed . 0x%0x.", m_NativeObj);
     vkDestroyRenderPass(NativeDevice(), m_NativeObj, nullptr);
     m_NativeObj = VK_NULL_HANDLE;
   }
@@ -2178,9 +2220,9 @@ Device::FindMemoryType(uint32 typeBits,
 }
 
 k3d::UnorderedAccessViewRef
-Device::CreateUnorderedAccessView(k3d::GpuResourceRef pResource, k3d::UAVDesc const& Desc)
+Device::CreateUnorderedAccessView(const k3d::GpuResourceRef& pResource, k3d::UAVDesc const& Desc)
 {
-  return k3d::UnorderedAccessViewRef();
+  return MakeShared<UnorderedAceessView>(SharedFromThis(), Desc, pResource);
 }
 
 SamplerRef
@@ -2685,7 +2727,7 @@ void CommandBufferManager::Destroy()
   if (!m_Pool)
     return;
   vkDeviceWaitIdle(m_Device);
-  VKLOG(Info, "CommandBufferManager destroy. -- 0x%0x.", m_Pool);
+  VKLOG(Info, "CommandBufferManager destroy. -- 0x%0x. thread (%s).", m_Pool, Os::Thread::GetCurrentThreadName().CStr());
   vkFreeCommandBuffers(m_Device, m_Pool, m_Buffers.Count(), m_Buffers.Data());
   vkDestroyCommandPool(m_Device, m_Pool, nullptr);
   m_Pool = VK_NULL_HANDLE;
@@ -2693,6 +2735,7 @@ void CommandBufferManager::Destroy()
 
 void CommandBufferManager::BeginFrame()
 {
+  Os::Thread::GetId();
   m_Count = 0;
 }
 

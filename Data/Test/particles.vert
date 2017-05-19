@@ -21,7 +21,9 @@ struct VS_IN
 
 cbuffer mat : register(b0)
 {
-  row_major matrix mvp;      
+    row_major matrix projectMatrix;
+    row_major matrix modelMatrix;
+    row_major matrix viewMatrix;   
 };
 
 struct VS_OUT
@@ -33,7 +35,7 @@ struct VS_OUT
 VS_OUT main(VS_IN vs_in)
 {
   VS_OUT vs_out;
-  vs_out.outPos = mvp * float4(vs_in.vert.xyz, 1.0);
+  vs_out.outPos = projectMatrix * viewMatrix * modelMatrix * float4(vs_in.vert.xyz, 1.0);
   vs_out.intensity = vs_in.vert.w;
   return vs_out;
 }
