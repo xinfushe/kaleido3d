@@ -224,7 +224,7 @@ CommandQueue::Present(SpSwapChain& pSwapChain)
     1,                               // waitSemaphoreCount
     &pSwapChain->m_smpPresent,       // pWaitSemaphores
     1,                               // SwapChainCount
-    &pSwapChain->m_SwapChain,
+    &pSwapChain->m_NativeObj,
     &pSwapChain->m_CurrentBufferID, // SwapChain Image Index
     &PresentResult
   };
@@ -1775,84 +1775,85 @@ FrameBuffer::Attachment::Attachment(VkFormat format,
   }
 }
 #endif
-SwapChain::~SwapChain()
-{
-  Release();
-}
 
-void
-SwapChain::Release()
+SwapChain::SwapChain(Device::Ptr pDevice, void* pWindow, k3d::SwapChainDesc& Desc)
+  : Super(pDevice)
 {
-  VKLOG(Info, "SwapChain Destroying..");
-  if (m_SwapChain) {
-    vkDestroySwapchainKHR(NativeDevice(), m_SwapChain, nullptr);
-    m_SwapChain = VK_NULL_HANDLE;
-  }
-  if (m_Surface) {
-    vkDestroySurfaceKHR(
-      m_Device->m_Gpu->GetInstance()->m_Instance, m_Surface, nullptr);
-    m_Surface = VK_NULL_HANDLE;
-  }
-  if (m_smpPresent) {
-    vkDestroySemaphore(NativeDevice(), m_smpPresent, nullptr);
-    m_smpPresent = VK_NULL_HANDLE;
-  }
-  if (m_smpRenderFinish) {
-    vkDestroySemaphore(NativeDevice(), m_smpRenderFinish, nullptr);
-    m_smpRenderFinish = VK_NULL_HANDLE;
-  }
-}
+  m_CachedCreateInfo = { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
+  m_CachedCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  m_CachedCreateInfo.imageArrayLayers = 1;
+  m_CachedCreateInfo.queueFamilyIndexCount = VK_SHARING_MODE_EXCLUSIVE;
+  m_CachedCreateInfo.oldSwapchain = VK_NULL_HANDLE;
+  m_CachedCreateInfo.clipped = VK_TRUE;
+  m_CachedCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 
-void
-SwapChain::Resize(uint32 Width, uint32 Height)
-{
-}
-
-k3d::TextureRef
-SwapChain::GetCurrentTexture()
-{
-  return m_Buffers[m_CurrentBufferID];
-}
-
-void
-SwapChain::Present()
-{
-}
-
-void
-SwapChain::QueuePresent(SpCmdQueue pQueue, k3d::SyncFenceRef pFence)
-{
-  VkPresentInfoKHR PresentInfo = {};
+  Init(pWindow, Desc);
 }
 
 void
 SwapChain::Init(void* pWindow, k3d::SwapChainDesc& Desc)
 {
   InitSurface(pWindow);
-  VkPresentModeKHR swapchainPresentMode = ChoosePresentMode();
-  std::pair<VkFormat, VkColorSpaceKHR> chosenFormat = ChooseFormat(Desc.Format);
-  Desc.Format = ConvertToRHIFormat(chosenFormat.first);
+
+  m_CachedCreateInfo.surface = m_Surface;
+  m_CachedCreateInfo.presentMode = ChoosePresentMode();
+
+  uint32_t formatCount = 0;
+  K3D_VK_VERIFY(
+    m_Device->m_Gpu->GetSurfaceFormatsKHR(m_Surface, &formatCount, NULL));
+  std::vector<VkSurfaceFormatKHR> surfFormats(formatCount);
+  K3D_VK_VERIFY(m_Device->m_Gpu->GetSurfaceFormatsKHR(
+    m_Surface, &formatCount, surfFormats.data()));
+  VkFormat colorFormat;
+  VkColorSpaceKHR colorSpace;
+  if (formatCount == 1 && surfFormats[0].format == VK_FORMAT_UNDEFINED) {
+    colorFormat = g_FormatTable[Desc.Format];
+  }
+  else {
+    K3D_ASSERT(formatCount >= 1);
+    colorFormat = surfFormats[0].format;
+  }
+  colorSpace = surfFormats[0].colorSpace;
+  m_CachedCreateInfo.imageColorSpace = colorSpace;
+  m_CachedCreateInfo.imageFormat = colorFormat;
+  m_CachedCreateInfo.imageExtent = { Desc.Width, Desc.Height };
+
+  Desc.Format = ConvertToRHIFormat(colorFormat);
+  
   m_SelectedPresentQueueFamilyIndex = ChooseQueueIndex();
-  m_SwapchainExtent = { Desc.Width, Desc.Height };
   VkSurfaceCapabilitiesKHR surfProperties;
   K3D_VK_VERIFY(
     m_Device->m_Gpu->GetSurfaceCapabilitiesKHR(m_Surface, &surfProperties));
-  m_SwapchainExtent = surfProperties.currentExtent;
+  m_CachedCreateInfo.imageExtent = surfProperties.currentExtent;
+  m_CachedCreateInfo.preTransform = surfProperties.currentTransform;
+
   uint32 desiredNumBuffers = kMath::Clamp(Desc.NumBuffers,
-                                          surfProperties.minImageCount,
-                                          surfProperties.maxImageCount);
-  m_DesiredBackBufferCount = desiredNumBuffers;
-  InitSwapChain(m_DesiredBackBufferCount,
-                chosenFormat,
-                swapchainPresentMode,
-                surfProperties.currentTransform);
+    surfProperties.minImageCount,
+    surfProperties.maxImageCount);
+
+  m_CachedCreateInfo.minImageCount = desiredNumBuffers;
+
+  K3D_VK_VERIFY(vkCreateSwapchainKHR(
+    NativeDevice(), 
+    &m_CachedCreateInfo, 
+    nullptr, 
+    &m_NativeObj)
+  );
+
   K3D_VK_VERIFY(vkGetSwapchainImagesKHR(
-    NativeDevice(), m_SwapChain, &m_ReserveBackBufferCount, nullptr));
-  m_ColorImages.resize(m_ReserveBackBufferCount);
-  K3D_VK_VERIFY(vkGetSwapchainImagesKHR(NativeDevice(),
-                                        m_SwapChain,
-                                        &m_ReserveBackBufferCount,
-                                        m_ColorImages.data()));
+    NativeDevice(), 
+    NativeHandle(), 
+    &m_ReserveBackBufferCount, 
+    nullptr));
+
+  m_ColorImages.Resize(m_ReserveBackBufferCount);
+
+  K3D_VK_VERIFY(vkGetSwapchainImagesKHR(
+    NativeDevice(),
+    NativeHandle(),
+    &m_ReserveBackBufferCount,
+    m_ColorImages.Data()));
+
   for (auto ColorImage : m_ColorImages) {
     k3d::ResourceDesc ImageDesc;
     ImageDesc.Type = k3d::EGT_Texture2D;
@@ -1860,8 +1861,8 @@ SwapChain::Init(void* pWindow, k3d::SwapChainDesc& Desc)
     ImageDesc.Flag = k3d::EGRAF_DeviceVisible;
     ImageDesc.Origin = k3d::ERO_Swapchain;
     ImageDesc.TextureDesc.Format = Desc.Format;
-    ImageDesc.TextureDesc.Width = m_SwapchainExtent.width;
-    ImageDesc.TextureDesc.Height = m_SwapchainExtent.height;
+    ImageDesc.TextureDesc.Width = m_CachedCreateInfo.imageExtent.width;
+    ImageDesc.TextureDesc.Height = m_CachedCreateInfo.imageExtent.height;
     ImageDesc.TextureDesc.Depth = 1;
     ImageDesc.TextureDesc.Layers = 1;
     ImageDesc.TextureDesc.MipLevels = 1;
@@ -1872,7 +1873,7 @@ SwapChain::Init(void* pWindow, k3d::SwapChainDesc& Desc)
   VKLOG(
     Info,
     "[SwapChain::Initialize] desired imageCount=%d, reserved imageCount = %d.",
-    m_DesiredBackBufferCount,
+    m_CachedCreateInfo.minImageCount,
     m_ReserveBackBufferCount);
 
   VkSemaphoreCreateInfo SemaphoreInfo = {
@@ -1890,7 +1891,7 @@ void
 SwapChain::AcquireNextImage()
 {
   VkResult Ret = vkAcquireNextImageKHR(NativeDevice(),
-    m_SwapChain,
+    m_NativeObj,
     UINT64_MAX,
     m_smpRenderFinish,
     VK_NULL_HANDLE,
@@ -1901,10 +1902,11 @@ SwapChain::AcquireNextImage()
   switch (Ret) {
   case VK_SUCCESS:
   case VK_SUBOPTIMAL_KHR:
+    VKLOG(Error, "VK_SUBOPTIMAL_KHR Swapchain need update");
     break;
   case VK_ERROR_OUT_OF_DATE_KHR:
     // OnWindowSizeChanged();
-    VKLOG(Info, "Swapchain need update");
+    VKLOG(Error, "VK_ERROR_OUT_OF_DATE_KHR Swapchain need update");
   default:
     break;
   }
@@ -1921,18 +1923,18 @@ SwapChain::InitSurface(void* WindowHandle)
   SurfaceCreateInfo.hwnd = (HWND)WindowHandle;
   K3D_VK_VERIFY(
     vkCreateWin32SurfaceKHR(m_Device->m_Gpu->GetInstance()->m_Instance,
-                            &SurfaceCreateInfo,
-                            nullptr,
-                            &m_Surface));
+      &SurfaceCreateInfo,
+      nullptr,
+      &m_Surface));
 #elif K3DPLATFORM_OS_ANDROID
   VkAndroidSurfaceCreateInfoKHR SurfaceCreateInfo = {};
   SurfaceCreateInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
   SurfaceCreateInfo.window = (ANativeWindow*)WindowHandle;
   K3D_VK_VERIFY(
     vkCreateAndroidSurfaceKHR(GetGpuRef()->GetInstance()->m_Instance,
-                              &SurfaceCreateInfo,
-                              nullptr,
-                              &m_Surface));
+      &SurfaceCreateInfo,
+      nullptr,
+      &m_Surface));
 #endif
 }
 
@@ -1952,32 +1954,11 @@ SwapChain::ChoosePresentMode()
       break;
     }
     if ((swapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR) &&
-        (presentModes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR)) {
+      (presentModes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR)) {
       swapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
     }
   }
   return swapchainPresentMode;
-}
-
-std::pair<VkFormat, VkColorSpaceKHR>
-SwapChain::ChooseFormat(k3d::EPixelFormat& Format)
-{
-  uint32_t formatCount;
-  K3D_VK_VERIFY(
-    m_Device->m_Gpu->GetSurfaceFormatsKHR(m_Surface, &formatCount, NULL));
-  std::vector<VkSurfaceFormatKHR> surfFormats(formatCount);
-  K3D_VK_VERIFY(m_Device->m_Gpu->GetSurfaceFormatsKHR(
-    m_Surface, &formatCount, surfFormats.data()));
-  VkFormat colorFormat;
-  VkColorSpaceKHR colorSpace;
-  if (formatCount == 1 && surfFormats[0].format == VK_FORMAT_UNDEFINED) {
-    colorFormat = g_FormatTable[Format];
-  } else {
-    K3D_ASSERT(formatCount >= 1);
-    colorFormat = surfFormats[0].format;
-  }
-  colorSpace = surfFormats[0].colorSpace;
-  return std::make_pair(colorFormat, colorSpace);
 }
 
 int
@@ -1998,34 +1979,115 @@ SwapChain::ChooseQueueIndex()
   return chosenIndex;
 }
 
-void
-SwapChain::InitSwapChain(uint32 numBuffers,
-                         std::pair<VkFormat, VkColorSpaceKHR> color,
-                         VkPresentModeKHR mode,
-                         VkSurfaceTransformFlagBitsKHR pretran)
+SwapChain::~SwapChain()
 {
-  VkSwapchainCreateInfoKHR swapchainCI = {
-    VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR
-  };
-  swapchainCI.surface = m_Surface;
-  swapchainCI.minImageCount = numBuffers;
-  swapchainCI.imageFormat = color.first;
-  m_ColorAttachFmt = color.first;
-  swapchainCI.imageColorSpace = color.second;
-  swapchainCI.imageExtent = m_SwapchainExtent;
-  swapchainCI.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  swapchainCI.preTransform = pretran;
-  swapchainCI.imageArrayLayers = 1;
-  swapchainCI.queueFamilyIndexCount = VK_SHARING_MODE_EXCLUSIVE;
-  swapchainCI.queueFamilyIndexCount = 0;
-  swapchainCI.pQueueFamilyIndices = NULL;
-  swapchainCI.presentMode = mode;
-  swapchainCI.oldSwapchain = VK_NULL_HANDLE;
-  swapchainCI.clipped = VK_TRUE;
-  swapchainCI.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  K3D_VK_VERIFY(
-    vkCreateSwapchainKHR(NativeDevice(), &swapchainCI, nullptr, &m_SwapChain));
-  VKLOG(Info, "Init Swapchain with ColorFmt(%d)", m_ColorAttachFmt);
+  Release();
+}
+
+void
+SwapChain::Release()
+{
+  VKLOG(Info, "SwapChain Destroying..");
+  if (m_NativeObj) {
+    vkDestroySwapchainKHR(NativeDevice(), m_NativeObj, nullptr);
+    m_NativeObj = VK_NULL_HANDLE;
+  }
+  if (m_Surface) {
+    vkDestroySurfaceKHR(
+      m_Device->m_Gpu->GetInstance()->m_Instance, m_Surface, nullptr);
+    m_Surface = VK_NULL_HANDLE;
+  }
+  if (m_smpPresent) {
+    vkDestroySemaphore(NativeDevice(), m_smpPresent, nullptr);
+    m_smpPresent = VK_NULL_HANDLE;
+  }
+  if (m_smpRenderFinish) {
+    vkDestroySemaphore(NativeDevice(), m_smpRenderFinish, nullptr);
+    m_smpRenderFinish = VK_NULL_HANDLE;
+  }
+}
+
+void
+SwapChain::Resize(uint32 Width, uint32 Height)
+{
+  VkSurfaceCapabilitiesKHR SurfProps;
+  K3D_VK_VERIFY(m_Device->m_Gpu->
+    GetSurfaceCapabilitiesKHR(m_Surface, &SurfProps));
+  
+  if (SurfProps.currentExtent.width == m_CachedCreateInfo.imageExtent.width
+    && SurfProps.currentExtent.height == m_CachedCreateInfo.imageExtent.height)
+    return;
+  // size changed
+  m_CachedCreateInfo.imageExtent = SurfProps.currentExtent;
+
+  vkDeviceWaitIdle(NativeDevice());
+  VkSwapchainKHR oldSwapchain = NativeHandle();
+
+  m_CachedCreateInfo.oldSwapchain = oldSwapchain;
+  K3D_VK_VERIFY(vkCreateSwapchainKHR(
+    NativeDevice(),
+    &m_CachedCreateInfo,
+    nullptr,
+    &m_NativeObj)
+  );
+
+  if (oldSwapchain != VK_NULL_HANDLE)
+  {
+    vkDestroySwapchainKHR(NativeDevice(), oldSwapchain, nullptr);
+    // deconstruct textures
+    m_Buffers.Clear();
+    m_ColorImages.Clear();
+
+    // clear Device cache
+    DeviceObjectCache::s_Framebuffer.erase(0);
+  }
+
+  K3D_VK_VERIFY(vkGetSwapchainImagesKHR(
+    NativeDevice(), 
+    NativeHandle(), 
+    &m_ReserveBackBufferCount, 
+    m_ColorImages.Data())
+  );
+  m_ColorImages.Resize(m_ReserveBackBufferCount);
+  
+  for (auto ColorImage : m_ColorImages) {
+    k3d::ResourceDesc ImageDesc;
+    ImageDesc.Type = k3d::EGT_Texture2D;
+    ImageDesc.ViewType = k3d::EGVT_RTV;
+    ImageDesc.Flag = k3d::EGRAF_DeviceVisible;
+    ImageDesc.Origin = k3d::ERO_Swapchain;
+    ImageDesc.TextureDesc.Format = ConvertToRHIFormat(m_CachedCreateInfo.imageFormat);
+    ImageDesc.TextureDesc.Width = m_CachedCreateInfo.imageExtent.width;
+    ImageDesc.TextureDesc.Height = m_CachedCreateInfo.imageExtent.height;
+    ImageDesc.TextureDesc.Depth = 1;
+    ImageDesc.TextureDesc.Layers = 1;
+    ImageDesc.TextureDesc.MipLevels = 1;
+    m_Buffers.Append(MakeShared<Texture>(ImageDesc,
+      ColorImage, SharedDevice(), false));
+  }
+  VKLOG(
+    Info,
+    "[SwapChain::Resized] Width=%d, Height=%d.",
+    m_CachedCreateInfo.imageExtent.width,
+    m_CachedCreateInfo.imageExtent.height
+   );
+}
+
+k3d::TextureRef
+SwapChain::GetCurrentTexture()
+{
+  return m_Buffers[m_CurrentBufferID];
+}
+
+void
+SwapChain::Present()
+{
+}
+
+void
+SwapChain::QueuePresent(SpCmdQueue pQueue, k3d::SyncFenceRef pFence)
+{
+  VkPresentInfoKHR PresentInfo = {};
 }
 
 ::k3d::DynArray<GpuRef>
@@ -2189,7 +2251,8 @@ Device::GetOrCreateFramebuffer(const k3d::RenderPassDesc& Info)
   }
   else
   {
-    VKLOG(Debug, "Framebuffer Cache Hit! (0x%0x). ", DeviceObjectCache::s_Framebuffer[Hash]->NativeHandle());
+    VKLOG(Debug, "Framebuffer Cache Hit! (0x%0x) HashCode:%ull. ",
+      DeviceObjectCache::s_Framebuffer[Hash]->NativeHandle(), Hash);
   }
   return DeviceObjectCache::s_Framebuffer[Hash];
 }

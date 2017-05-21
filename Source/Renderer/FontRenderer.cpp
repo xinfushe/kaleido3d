@@ -182,12 +182,20 @@ namespace render
 	{
 	}
 
-	void FontRenderer::InitPSO()
+	void FontRenderer::InitPSO(k3d::RenderPassRef pRenderPass)
 	{
 		auto shMod = k3d::StaticPointerCast<k3d::IShModule>(ACQUIRE_PLUGIN(ShaderCompiler));
 		if (!shMod)
 			return;
 		auto glslc = shMod->CreateShaderCompiler(k3d::ERHI_Vulkan);
+
+    // compile shaders
+
+    // create pso and binding groups
 	}
+
+  void FontRenderer::Draw(k3d::String const & Text, kMath::Vec3f Position)
+  {
+  }
 	
 }

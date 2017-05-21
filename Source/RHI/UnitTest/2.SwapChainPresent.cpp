@@ -72,6 +72,7 @@ void SwapchainPresent::OnDestroy() {
 void SwapchainPresent::OnProcess(Message &msg) {
 	auto cmdBuffer = m_pCmdQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
 	auto presentImage = m_pSwapChain->GetCurrentTexture();
+
 	cmdBuffer->Transition(presentImage, k3d::ERS_Present);
 	cmdBuffer->Present(m_pSwapChain, nullptr);
 	cmdBuffer->Commit();

@@ -1365,16 +1365,13 @@ private:
 
 class SwapChain : public TVkRHIObjectBase<VkSwapchainKHR, k3d::ISwapChain>
 {
+  friend class CommandQueue;
+  friend class CommandBuffer;
 public:
-  using This = TVkRHIObjectBase<VkSwapchainKHR, k3d::ISwapChain>;
+  using Super = TVkRHIObjectBase<VkSwapchainKHR, k3d::ISwapChain>;
 
+  SwapChain(Device::Ptr pDevice, void* pWindow, k3d::SwapChainDesc& Desc);
   ~SwapChain();
-
-  SwapChain(Device::Ptr pDevice, void* pWindow, k3d::SwapChainDesc& Desc)
-    : SwapChain::This(pDevice)
-  {
-    Init(pWindow, Desc);
-  }
 
   // ISwapChain::Release
   void Release() override;
@@ -1397,43 +1394,30 @@ public:
   }
 
   uint32 GetBackBufferCount() const { return m_ReserveBackBufferCount; }
-
-  VkSwapchainKHR GetSwapChain() const { return m_SwapChain; }
   VkImage GetBackImage(uint32 i) const { return m_ColorImages[i]; }
-
-  VkExtent2D GetCurrentExtent() const { return m_SwapchainExtent; }
-  VkFormat GetFormat() const { return m_ColorAttachFmt; }
+  VkExtent2D GetCurrentExtent() const { return m_CachedCreateInfo.imageExtent; }
+  VkFormat GetFormat() const { return m_CachedCreateInfo.imageFormat; }
 
 private:
   void InitSurface(void* WindowHandle);
   VkPresentModeKHR ChoosePresentMode();
-  std::pair<VkFormat, VkColorSpaceKHR> ChooseFormat(k3d::EPixelFormat& Format);
   int ChooseQueueIndex();
-  void InitSwapChain(uint32 numBuffers,
-                     std::pair<VkFormat, VkColorSpaceKHR> color,
-                     VkPresentModeKHR mode,
-                     VkSurfaceTransformFlagBitsKHR pretran);
 
 private:
-  friend class CommandQueue;
-  friend class CommandBuffer;
 
   VkSemaphore m_smpRenderFinish = VK_NULL_HANDLE;
   VkSemaphore m_smpPresent = VK_NULL_HANDLE;
-
-  VkExtent2D m_SwapchainExtent = {};
   VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
-  VkSwapchainKHR m_SwapChain = VK_NULL_HANDLE;
 
   uint32 m_CurrentBufferID = 0;
   uint32 m_SelectedPresentQueueFamilyIndex = 0;
-  uint32 m_DesiredBackBufferCount;
-  uint32 m_ReserveBackBufferCount;
 
-  VkFormat m_ColorAttachFmt = VK_FORMAT_UNDEFINED;
+  uint32 m_ReserveBackBufferCount = 0;
+
+  VkSwapchainCreateInfoKHR m_CachedCreateInfo;
 
   DynArray<k3d::TextureRef> m_Buffers;
-  std::vector<VkImage> m_ColorImages;
+  DynArray<VkImage> m_ColorImages;
 };
 
 class RenderPass;

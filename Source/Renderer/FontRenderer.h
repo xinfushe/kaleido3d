@@ -2,6 +2,7 @@
 #include <Interface/IRHI.h>
 #include <KTL/DynArray.hpp>
 #include <KTL/String.hpp>
+#include <Math/kMath.hpp>
 
 #include <unordered_map>
 
@@ -58,6 +59,8 @@ public:
 
   void InitVertexBuffers(k3d::DeviceRef const& device);
 
+  // text atlas?
+
 private:
   static short s_Indices[];
   static float s_Vertices[];
@@ -73,7 +76,9 @@ class FontRenderer
 public:
   explicit FontRenderer(k3d::DeviceRef const& device);
   ~FontRenderer();
-  void InitPSO();
+  void InitPSO(k3d::RenderPassRef pRenderPass);
+  void Draw(k3d::String const& Text, kMath::Vec3f Position);
+
 private:
   k3d::DeviceRef m_Device;
   k3d::RenderPipelineStateRef m_TextRenderPSO;

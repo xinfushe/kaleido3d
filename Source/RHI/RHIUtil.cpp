@@ -53,10 +53,14 @@ uint64 HashAttachments(RenderPassDesc const& Desc)
   auto Attachments = Desc.ColorAttachments;
   for (auto Attachment : Attachments)
   {
-    auto TextureAddr = (uint64)Attachment.pTexture.Get();
+    auto TextureAddr = Attachment.pTexture->GetLocation();
+    auto TextureDesc = Attachment.pTexture->GetDesc();
     HashCode = util::Hash64WithSeed(
       (const char*)&TextureAddr,
       8, HashCode);
+    HashCode = util::Hash64WithSeed(
+      (const char*)&TextureDesc,
+      sizeof(TextureDesc), HashCode);
   }
   return HashCode;
 }
