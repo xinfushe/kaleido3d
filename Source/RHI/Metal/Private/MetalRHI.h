@@ -41,7 +41,7 @@ public:
 
     k3d::GpuResourceRef         CreateResource(k3d::ResourceDesc const&)override;
     k3d::ShaderResourceViewRef	CreateShaderResourceView(k3d::GpuResourceRef, k3d::SRVDesc const&)override;
-    k3d::UnorderedAccessViewRef CreateUnorderedAccessView(k3d::GpuResourceRef, k3d::UAVDesc const&) override;
+    k3d::UnorderedAccessViewRef CreateUnorderedAccessView(const k3d::GpuResourceRef&, k3d::UAVDesc const&) override;
     k3d::SamplerRef             CreateSampler(const k3d::SamplerState&)override;
     k3d::PipelineLayoutRef		CreatePipelineLayout(k3d::PipelineLayoutDesc const & table) override;
     k3d::SyncFenceRef           CreateFence()override;

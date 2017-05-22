@@ -548,11 +548,23 @@ Texture::GetResourceView() const
         return m_Device;
     }
 
+k3d::GpuResourceRef
+Device::CreateResource(const k3d::ResourceDesc &)
+{
+    return nullptr;
+}
+
     k3d::ShaderResourceViewRef
     Device::CreateShaderResourceView(k3d::GpuResourceRef, const k3d::SRVDesc &)
     {
         return nullptr;
     }
+
+k3d::UnorderedAccessViewRef
+Device::CreateUnorderedAccessView(const k3d::GpuResourceRef &, const k3d::UAVDesc &)
+{
+    return nullptr;
+}
 
     k3d::SamplerRef
     Device::CreateSampler(const k3d::SamplerState&)
@@ -571,6 +583,39 @@ Texture::GetResourceView() const
     {
         return nullptr;
     }
+
+k3d::RenderPassRef
+Device::CreateRenderPass(const k3d::RenderPassDesc &)
+{
+    return nullptr;
+}
+
+k3d::PipelineStateRef
+Device::CreateRenderPipelineState(k3d::RenderPipelineStateDesc const&,
+                                  k3d::PipelineLayoutRef,
+                                  k3d::RenderPassRef)
+{
+    return nullptr;
+}
+
+k3d::PipelineStateRef
+Device::CreateComputePipelineState(k3d::ComputePipelineStateDesc const&,
+                                   k3d::PipelineLayoutRef)
+{
+    return nullptr;
+}
+
+k3d::CommandQueueRef
+Device::CreateCommandQueue(k3d::ECommandType const&)
+{
+    return nullptr;
+}
+
+void
+Device::WaitIdle()
+{
+    
+}
 
 #if 0
     // The pixel format for a Metal layer must be bgra8Unorm, bgra8Unorm_srgb, or rgba16Float.
