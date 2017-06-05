@@ -86,24 +86,24 @@ namespace render
 		return quadlist;
 	}
 
-	CharTexture::CharTexture(k3d::DeviceRef device, TextQuad const & quad)
+	CharTexture::CharTexture(k3d::NGFXDeviceRef device, TextQuad const & quad)
 	{
 		k3d::ResourceDesc texDesc;
-		texDesc.Type = k3d::EGT_Texture2D;
-		texDesc.ViewType = k3d::EGpuMemViewType::EGVT_SRV;
-		texDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
-		texDesc.TextureDesc.Format = k3d::EPF_RGBA8Unorm; // TODO font color fmt inconsistent
+		texDesc.Type = NGFX_TEXTURE_2D;
+		texDesc.ViewFlags = NGFX_RESOURCE_SHADER_RESOURCE_VIEW;
+		texDesc.Flag = NGFX_ACCESS_HOST_VISIBLE;
+		texDesc.TextureDesc.Format = NGFX_PIXEL_FORMAT_RGBA8_UNORM; // TODO font color fmt inconsistent
 		texDesc.TextureDesc.Width = quad.W;
 		texDesc.TextureDesc.Height = quad.H;
 		texDesc.TextureDesc.Layers = 1;
 		texDesc.TextureDesc.MipLevels = 1;
 		texDesc.TextureDesc.Depth = 1;
-		m_Texture = ::k3d::DynamicPointerCast<k3d::ITexture>(device->CreateResource(texDesc));
+		m_Texture = ::k3d::DynamicPointerCast<k3d::NGFXTexture>(device->CreateResource(texDesc));
 
 		uint64 sz = m_Texture->GetSize();
 		void * pData = m_Texture->Map(0, sz);
 		k3d::SubResourceLayout layout = {};
-		k3d::TextureSpec spec = { k3d::ETAF_COLOR,0,0 };
+		k3d::TextureSpec spec = { NGFX_ASPECT_COLOR,0,0 };
 		device->QueryTextureSubResourceLayout(m_Texture, spec, &layout);
 		if (quad.W * 4 == layout.RowPitch)
 		{
@@ -122,9 +122,9 @@ namespace render
 		}
 		m_Texture->UnMap();
 #if 0
-		auto cmd = device->NewCommandContext(k3d::ECMD_Graphics);
+		auto cmd = device->NewCommandContext(NGFX_COMMAND_GRAPHICS);
 		cmd->Begin();
-		cmd->TransitionResourceBarrier(m_Texture, k3d::ERS_ShaderResource);
+		cmd->TransitionResourceBarrier(m_Texture, NGFX_RESOURCE_STATE_SHADER_RESOURCE);
 		cmd->End();
 		cmd->Execute(false);
 #endif
@@ -148,11 +148,11 @@ namespace render
 	}
 	
 
-	void CharRenderer::InitVertexBuffers(k3d::DeviceRef const & device)
+	void CharRenderer::InitVertexBuffers(k3d::NGFXDeviceRef const & device)
 	{
 		k3d::ResourceDesc vboDesc;
-		vboDesc.ViewType = k3d::EGpuMemViewType::EGVT_VBV;
-		vboDesc.Flag = (k3d::EGpuResourceAccessFlag) (k3d::EGpuResourceAccessFlag::EGRAF_HostCoherent | k3d::EGpuResourceAccessFlag::EGRAF_HostVisible);
+		vboDesc.ViewFlags = NGFX_RESOURCE_VERTEX_BUFFER_VIEW;
+		vboDesc.Flag = NGFX_ACCESS_HOST_COHERENT | NGFX_ACCESS_HOST_VISIBLE;
 		vboDesc.Size = sizeof(s_Vertices);
 		m_VertexBuffer = device->CreateResource(vboDesc);
 		void * ptr = m_VertexBuffer->Map(0, vboDesc.Size);
@@ -160,8 +160,8 @@ namespace render
 		m_VertexBuffer->UnMap();
 
 		k3d::ResourceDesc iboDesc;
-		iboDesc.ViewType = k3d::EGpuMemViewType::EGVT_IBV;
-		iboDesc.Flag = (k3d::EGpuResourceAccessFlag) (k3d::EGpuResourceAccessFlag::EGRAF_HostCoherent | k3d::EGpuResourceAccessFlag::EGRAF_HostVisible);
+		iboDesc.ViewFlags = NGFX_RESOURCE_INDEX_BUFFER_VIEW;
+    iboDesc.Flag = NGFX_ACCESS_HOST_COHERENT | NGFX_ACCESS_HOST_VISIBLE;
 		iboDesc.Size = sizeof(s_Indices);
 		m_IndexBuffer = device->CreateResource(iboDesc);
 		ptr = m_IndexBuffer->Map(0, iboDesc.Size);
@@ -173,7 +173,7 @@ namespace render
 	{
 	}
 
-	FontRenderer::FontRenderer(k3d::DeviceRef const& device)
+	FontRenderer::FontRenderer(k3d::NGFXDeviceRef const& device)
 		: m_Device(device)
 	{
 	}
@@ -182,12 +182,12 @@ namespace render
 	{
 	}
 
-	void FontRenderer::InitPSO(k3d::RenderPassRef pRenderPass)
+	void FontRenderer::InitPSO(k3d::NGFXRenderpassRef pRenderPass)
 	{
 		auto shMod = k3d::StaticPointerCast<k3d::IShModule>(ACQUIRE_PLUGIN(ShaderCompiler));
 		if (!shMod)
 			return;
-		auto glslc = shMod->CreateShaderCompiler(k3d::ERHI_Vulkan);
+		auto glslc = shMod->CreateShaderCompiler(NGFX_RHI_VULKAN);
 
     // compile shaders
 

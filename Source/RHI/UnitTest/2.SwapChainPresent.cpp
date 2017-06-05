@@ -30,14 +30,14 @@ public:
 
 private:
   SharedPtr<IModule> m_pRHI;
-  k3d::FactoryRef m_pFactory;
+  k3d::NGFXFactoryRef m_pFactory;
 
   void InitRHIObjects();
 
-  k3d::DeviceRef m_pDevice;
-  k3d::CommandQueueRef m_pCmdQueue;
-  k3d::SwapChainRef m_pSwapChain;
-  k3d::SyncFenceRef m_pFrameFence;
+  k3d::NGFXDeviceRef m_pDevice;
+  k3d::NGFXCommandQueueRef m_pCmdQueue;
+  k3d::NGFXSwapChainRef m_pSwapChain;
+  k3d::NGFXFenceRef m_pFrameFence;
 };
 
 K3D_APP_MAIN(SwapchainPresent);
@@ -50,7 +50,7 @@ bool SwapchainPresent::OnInit() {
   pVkRHI->Initialize("SwapChainTest", true);
   pVkRHI->Start();
   m_pFactory = pVkRHI->GetFactory();
-  DynArray<k3d::DeviceRef> Devices;
+  DynArray<k3d::NGFXDeviceRef> Devices;
   m_pFactory->EnumDevices(Devices);
   m_pDevice = Devices[0];
 #else
@@ -70,10 +70,10 @@ void SwapchainPresent::OnDestroy() {
 }
 
 void SwapchainPresent::OnProcess(Message &msg) {
-	auto cmdBuffer = m_pCmdQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
+	auto cmdBuffer = m_pCmdQueue->ObtainCommandBuffer(NGFX_COMMAND_USAGE_ONE_SHOT);
 	auto presentImage = m_pSwapChain->GetCurrentTexture();
 
-	cmdBuffer->Transition(presentImage, k3d::ERS_Present);
+	cmdBuffer->Transition(presentImage, NGFX_RESOURCE_STATE_PRESENT);
 	cmdBuffer->Present(m_pSwapChain, nullptr);
 	cmdBuffer->Commit();
 	cmdBuffer->Release();
@@ -81,8 +81,8 @@ void SwapchainPresent::OnProcess(Message &msg) {
 
 void SwapchainPresent::InitRHIObjects()
 {
-	m_pCmdQueue = m_pDevice->CreateCommandQueue(k3d::ECMD_Graphics);
-	k3d::SwapChainDesc desc = { k3d::EPF_RGBA8Unorm, 1920, 1080, 2 };
+	m_pCmdQueue = m_pDevice->CreateCommandQueue(NGFX_COMMAND_GRAPHICS);
+	k3d::SwapChainDesc desc = { NGFX_PIXEL_FORMAT_RGBA8_UNORM, 1920, 1080, 2 };
 	m_pSwapChain = m_pFactory->CreateSwapchain(m_pCmdQueue, HostWindow()->GetHandle(), desc);
   m_pFrameFence = m_pDevice->CreateFence();
 }

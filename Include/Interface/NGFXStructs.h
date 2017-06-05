@@ -1,7 +1,7 @@
 #ifndef __RHIStructs_h__
 #define __RHIStructs_h__
 
-#include "RHIEnums.h"
+#include "NGFXEnums.h"
 #include "ShaderCommon.h"
 
 K3D_COMMON_NS
@@ -20,64 +20,29 @@ K3D_COMMON_NS
   EPS_All				= 0x10000
   };*/
 
-  /**
-   * @see GfxSetting
-   */
-  struct RenderTargetFormat
-  {
-    RenderTargetFormat()
-    {
-      NumRTs = 1;
-      RenderPixelFormats = new EPixelFormat{ EPF_RGBA8Unorm };
-      DepthPixelFormat = EPF_RGBA8Unorm;
-      MSAACount = 1;
-    }
-    uint32 NumRTs;
-    EPixelFormat* RenderPixelFormats;
-    EPixelFormat DepthPixelFormat;
-    uint32 MSAACount;
-  };
-
   struct BlendState
   {
-    enum EOperation : uint8
-    {
-      Add,
-      Sub,
-      BlendOpNum
-    };
-    enum EBlend : uint8
-    {
-      Zero,
-      One,
-      SrcColor,
-      DestColor,
-      SrcAlpha,
-      DestAlpha,
-      BlendTypeNum
-    };
-
     bool Enable;
     uint32 ColorWriteMask;
 
-    EBlend Src;
-    EBlend Dest;
-    EOperation Op;
+    NGFXBlendFactor Src;
+    NGFXBlendFactor Dest;
+    NGFXBlendOperation Op;
 
-    EBlend SrcBlendAlpha;
-    EBlend DestBlendAlpha;
-    EOperation BlendAlphaOp;
+    NGFXBlendFactor SrcBlendAlpha;
+    NGFXBlendFactor DestBlendAlpha;
+    NGFXBlendOperation BlendAlphaOp;
 
     BlendState()
     {
       Enable = false;
-      Src = EBlend::One;
-      Dest = EBlend::Zero;
-      Op = EOperation::Add;
+      Src = NGFXBlendFactor::NGFX_BLEND_FACTOR_ONE;
+      Dest = NGFXBlendFactor::NGFX_BLEND_FACTOR_ZERO;
+      Op = NGFXBlendOperation::NGFX_BLEND_OP_ADD;
 
-      SrcBlendAlpha = EBlend::One;
-      DestBlendAlpha = EBlend::Zero;
-      BlendAlphaOp = EOperation::Add;
+      SrcBlendAlpha = NGFXBlendFactor::NGFX_BLEND_FACTOR_ONE;
+      DestBlendAlpha = NGFXBlendFactor::NGFX_BLEND_FACTOR_ZERO;
+      BlendAlphaOp = NGFXBlendOperation::NGFX_BLEND_OP_ADD;
       ColorWriteMask = 0xf;
     }
   };
@@ -85,38 +50,24 @@ K3D_COMMON_NS
   struct AttachmentState
   {
     BlendState Blend;
-    EPixelFormat Format; // for metal
+    NGFXPixelFormat Format; // for metal
   };
 
   struct RasterizerState
   {
-    enum EFillMode : uint8
-    {
-      WireFrame,
-      Solid,
-      FillModeNum
-    };
-    enum ECullMode : uint8
-    {
-      None,
-      Front,
-      Back,
-      CullModeNum
-    };
-
-    EFillMode FillMode;
-    ECullMode CullMode;
+    NGFXFillMode FillMode;
+    NGFXCullMode CullMode;
     bool FrontCCW;
     int32 DepthBias;
     float DepthBiasClamp;
     bool DepthClipEnable;
     bool MultiSampleEnable;
-    EMultiSampleFlag MSFlag;
+    NGFXMultiSampleFlag MSFlag;
 
     RasterizerState()
     {
-      FillMode = EFillMode::Solid;
-      CullMode = ECullMode::Back;
+      FillMode = NGFXFillMode::NGFX_FILL_MODE_SOLID;
+      CullMode = NGFXCullMode::NGFX_CULL_MODE_BACK;
       FrontCCW = false;
       DepthBias = 0;
       DepthBiasClamp = 0.0f;
@@ -127,56 +78,25 @@ K3D_COMMON_NS
 
   struct DepthStencilState
   {
-    enum EStencilOp : uint8
-    {
-      Keep,
-      Zero,
-      Replace,
-      Invert,
-      Increment,
-      Decrement,
-      StencilOpNum
-    };
-
-    enum EComparisonFunc : uint8
-    {
-      Never,
-      Less,
-      Equal,
-      LessEqual,
-      Greater,
-      NotEqual,
-      GreaterEqual,
-      Always,
-      ComparisonFuncNum
-    };
-
-    enum EDepthWriteMask : uint8
-    {
-      WriteZero,
-      WriteAll,
-      DepthWriteMaskNum
-    };
-
     struct Op
     {
-      EStencilOp StencilFailOp;
-      EStencilOp DepthStencilFailOp;
-      EStencilOp StencilPassOp;
-      EComparisonFunc StencilFunc;
+      NGFXStencilOp StencilFailOp;
+      NGFXStencilOp DepthStencilFailOp;
+      NGFXStencilOp StencilPassOp;
+      NGFXComparisonFunc StencilFunc;
 
       Op()
       {
-        StencilFailOp = EStencilOp::Keep;
-        DepthStencilFailOp = EStencilOp::Keep;
-        StencilPassOp = EStencilOp::Keep;
-        StencilFunc = EComparisonFunc::Always;
+        StencilFailOp = NGFXStencilOp::NGFX_STENCIL_OP_KEEP;
+        DepthStencilFailOp = NGFXStencilOp::NGFX_STENCIL_OP_KEEP;
+        StencilPassOp = NGFXStencilOp::NGFX_STENCIL_OP_KEEP;
+        StencilFunc = NGFXComparisonFunc::NGFX_COMPARISON_FUNCTION_ALWAYS;
       }
     };
 
     bool DepthEnable;
-    EDepthWriteMask DepthWriteMask;
-    EComparisonFunc DepthFunc;
+    NGFXDepthWriteMask DepthWriteMask;
+    NGFXComparisonFunc DepthFunc;
 
     bool StencilEnable;
     uint8 StencilReadMask;
@@ -187,8 +107,8 @@ K3D_COMMON_NS
     DepthStencilState()
     {
       DepthEnable = false;
-      DepthWriteMask = EDepthWriteMask::WriteAll;
-      DepthFunc = EComparisonFunc::Less;
+      DepthWriteMask = NGFXDepthWriteMask::NGFX_DEPTH_WRITE_MASK_ALL;
+      DepthFunc = NGFXComparisonFunc::NGFX_COMPARISON_FUNCTION_LESS;
 
       StencilEnable = false;
       StencilReadMask = 0xff;
@@ -198,62 +118,37 @@ K3D_COMMON_NS
 
   struct SamplerState
   {
-    typedef DepthStencilState::EComparisonFunc EComparisonFunc;
-    enum EFilterMethod : uint8
-    {
-      Point, // Nearest
-      Linear,
-      FilterMethodNum
-    };
-    enum EFilterReductionType : uint8
-    {
-      Standard,
-      Comparison, // all three other filter should be linear
-      Minimum,
-      Maximum,
-      FilterReductionTypeNum
-    };
-    enum ETextureAddressMode : uint8
-    {
-      Wrap,
-      Mirror, // Repeat
-      Clamp,
-      Border,
-      MirrorOnce,
-      AddressModeNum
-    };
-
     struct Filter
     {
-      EFilterMethod MinFilter;
-      EFilterMethod MagFilter;
-      EFilterMethod MipMapFilter;
-      EFilterReductionType ReductionType;
+      NGFXFilterMethod MinFilter;
+      NGFXFilterMethod MagFilter;
+      NGFXFilterMethod MipMapFilter;
+      NGFXFilterReductionType ReductionType;
       Filter()
       {
-        MinFilter = EFilterMethod::Linear;
-        MagFilter = EFilterMethod::Linear;
-        MipMapFilter = EFilterMethod::Linear;
-        ReductionType = EFilterReductionType::Standard;
+        MinFilter = NGFXFilterMethod::NGFX_FILTER_METHOD_LINEAR;
+        MagFilter = NGFXFilterMethod::NGFX_FILTER_METHOD_LINEAR;
+        MipMapFilter = NGFXFilterMethod::NGFX_FILTER_METHOD_LINEAR;
+        ReductionType = NGFXFilterReductionType::EFRT_Standard;
       }
     };
 
     Filter Filter;
-    ETextureAddressMode U, V, W;
+    NGFXAddressMode U, V, W;
     float MipLODBias;
     uint32 MaxAnistropy;
-    EComparisonFunc ComparisonFunc;
+    NGFXComparisonFunc ComparisonFunc;
     float BorderColor[4];
     float MinLOD;
     float MaxLOD;
 
     SamplerState()
-      : U(ETextureAddressMode::Wrap)
-      , V(ETextureAddressMode::Wrap)
-      , W(ETextureAddressMode::Wrap)
+      : U(NGFXAddressMode::NGFX_ADDRESS_MODE_WRAP)
+      , V(NGFXAddressMode::NGFX_ADDRESS_MODE_WRAP)
+      , W(NGFXAddressMode::NGFX_ADDRESS_MODE_WRAP)
       , MipLODBias(0)
       , MaxAnistropy(16)
-      , ComparisonFunc(EComparisonFunc::LessEqual)
+      , ComparisonFunc(NGFXComparisonFunc::NGFX_COMPARISON_FUNCTION_LESS_EQUAL)
       , MinLOD(0)
       , MaxLOD(3.402823466e+38f)
     {
@@ -271,7 +166,7 @@ K3D_COMMON_NS
 
     struct Attribute
     {
-      Attribute(EVertexFormat const& format = EVF_Float3x32,
+      Attribute(NGFXVertexFormat const& format = NGFX_VERTEX_FORMAT_FLOAT3X32,
         uint32 offset = kInvalidValue,
         uint32 slot = kInvalidValue)
         : Format(format)
@@ -280,21 +175,21 @@ K3D_COMMON_NS
       {
       }
 
-      EVertexFormat Format /* = EVF_Float3x32*/;
+      NGFXVertexFormat Format /* = NGFX_VERTEX_FORMAT_FLOAT3X32*/;
       uint32 OffSet /* = kInvalidValue*/;
       uint32 Slot /* = kInvalidValue*/;
     };
 
     struct Layout
     {
-      Layout(EVertexInputRate const& inputRate = EVIR_PerVertex,
+      Layout(NGFXVertexInputRate const& inputRate = NGFX_VERTEX_INPUT_RATE_PER_VERTEX,
         uint32 stride = kInvalidValue)
         : Rate(inputRate)
         , Stride(stride)
       {
       }
 
-      EVertexInputRate Rate /* = EVIR_PerVertex */;
+      NGFXVertexInputRate Rate /* = NGFX_VERTEX_INPUT_RATE_PER_VERTEX */;
       uint32 Stride /* = kInvalidValue*/;
     };
 
@@ -309,7 +204,7 @@ K3D_COMMON_NS
   struct RenderPipelineStateDesc
   {
     RenderPipelineStateDesc()
-      : PrimitiveTopology(EPT_Triangles)
+      : PrimitiveTopology(NGFX_PRIMITIVE_TRIANGLES)
       , PatchControlPoints(0)
       , DepthAttachmentFormat()
     {
@@ -317,18 +212,18 @@ K3D_COMMON_NS
     RasterizerState Rasterizer;
     AttachmentStateArray AttachmentsBlend;  // 
     DepthStencilState DepthStencil;
-    EPixelFormat DepthAttachmentFormat;     // for metal
+    NGFXPixelFormat DepthAttachmentFormat;     // for metal
     VertexInputState InputState;
     // InputAssemblyState
-    EPrimitiveType PrimitiveTopology /* = rhi::EPT_Triangles */;
+    NGFXPrimitiveType PrimitiveTopology /* = rhi::NGFX_PRIMITIVE_TRIANGLES */;
     // Tessellation Patch
     uint32 PatchControlPoints /* = 0*/;
 
-    ShaderBundle VertexShader;
-    ShaderBundle PixelShader;
-    ShaderBundle GeometryShader;
-    ShaderBundle DomainShader;
-    ShaderBundle HullShader;
+    NGFXShaderBundle VertexShader;
+    NGFXShaderBundle PixelShader;
+    NGFXShaderBundle GeometryShader;
+    NGFXShaderBundle DomainShader;
+    NGFXShaderBundle HullShader;
   };
 
   struct Rect
@@ -384,7 +279,7 @@ K3D_COMMON_NS
 
   struct SwapChainDesc
   {
-    EPixelFormat Format;
+    NGFXPixelFormat Format;
     uint32 Width;
     uint32 Height;
     uint32 NumBuffers;
@@ -395,7 +290,7 @@ K3D_COMMON_NS
    */
   struct TextureDesc
   {
-    EPixelFormat Format;
+    NGFXPixelFormat Format;
     uint32 Width;
     uint32 Height;
     uint32 Depth;
@@ -403,7 +298,7 @@ K3D_COMMON_NS
     uint32 Layers;
 
     TextureDesc(
-      EPixelFormat _Format = EPF_RGBA8Unorm
+      NGFXPixelFormat _Format = NGFX_PIXEL_FORMAT_RGBA8_UNORM
       , uint32 _Width = 0
       , uint32 _Height = 0
       , uint32 _Depth = 1
@@ -427,33 +322,33 @@ K3D_COMMON_NS
    * which needs extra memory. */
   struct ResourceDesc
   {
-    EGpuResourceType Type;
-    EGpuResourceAccessFlag Flag;
-    EGpuResourceCreationFlag CreationFlag;
-    EGpuMemViewType ViewType;
-    EResourceOrigin Origin;
+    NGFXResourceType Type;
+    NGFXResourceAccessFlag Flag;
+    NGFXResourceCreationFlag CreationFlag;
+    NGFXResourceViewTypeBits ViewFlags; // for resource view prediction
+    NGFXResourceOrigin Origin;
     union
     {
       TextureDesc TextureDesc;
       uint64 Size;
     };
     ResourceDesc()
-      : Type(EGT_Buffer)
-      , Flag(EGRAF_ReadAndWrite)
-      , CreationFlag(EGRCF_Dynamic)
-      , ViewType(EGVT_SRV)
-      , Origin(ERO_User)
+      : Type(NGFX_BUFFER)
+      , Flag(NGFX_ACCESS_READ_AND_WRITE)
+      , CreationFlag(NGFX_RESOURCE_DYNAMIC)
+      , ViewFlags(NGFX_RESOURCE_SHADER_RESOURCE_VIEW)
+      , Origin(NGFX_RESOURCE_ORIGIN_USER)
     {
     }
-    ResourceDesc(EGpuResourceType t,
-                 EGpuResourceAccessFlag f,
-                 EGpuResourceCreationFlag cf,
-                 EGpuMemViewType viewType)
+    ResourceDesc(NGFXResourceType t,
+                 NGFXResourceAccessFlag f,
+                 NGFXResourceCreationFlag cf,
+                 NGFXResourceViewTypeBits viewType)
       : Type(t)
       , Flag(f)
       , CreationFlag(cf)
-      , ViewType(viewType)
-      , Origin(ERO_User)
+      , ViewFlags(viewType)
+      , Origin(NGFX_RESOURCE_ORIGIN_USER)
     {
     }
   };
@@ -461,7 +356,7 @@ K3D_COMMON_NS
   /*same as VkImageSubresource */
   struct TextureSpec
   {
-    ETextureAspectFlag Aspect;
+    NGFXTextureAspectFlag Aspect;
     uint32 MipLevel;
     uint32 ArrayLayer;
   };
@@ -480,8 +375,8 @@ K3D_COMMON_NS
    */
   struct UAVDesc
   {
-    EViewDimension Dim;
-    EPixelFormat Format;
+    NGFXViewDimension Dim;
+    NGFXPixelFormat Format;
     union
     {
       BufferSpec Buffer;
@@ -494,8 +389,8 @@ K3D_COMMON_NS
    */
   struct SRVDesc
   {
-    EViewDimension Dim;
-    EPixelFormat Format;
+    NGFXViewDimension Dim;
+    NGFXPixelFormat Format;
     union
     {
       BufferSpec Buffer;
@@ -505,7 +400,7 @@ K3D_COMMON_NS
 
   struct ResourceViewDesc
   {
-    EGpuMemViewType ViewType;
+    NGFXResourceViewTypeBits ViewType;
     union 
     {
       TextureSpec TextureSpec;

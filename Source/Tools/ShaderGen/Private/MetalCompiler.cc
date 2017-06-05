@@ -13,11 +13,10 @@
 #include <string.h>
 
 using namespace std;
-using namespace k3d::shc;
 
 namespace k3d
 {
-    EResult mtlCompile(string const& source, String & metalIR);
+    NGFXShaderCompileResult mtlCompile(string const& source, String & metalIR);
 
     MetalCompiler::MetalCompiler()
     {
@@ -28,147 +27,146 @@ namespace k3d
     {
         sFinializeGlSlang();
     }
-    
-    EResult MetalCompiler::Compile(String const& src, k3d::ShaderDesc const& inOp, k3d::ShaderBundle & bundle)
-    {
-        if(inOp.Format == k3d::EShFmt_Text)
-        {
-            if(inOp.Lang == k3d::EShLang_MetalSL)
-            {
-                if(m_IsMac)
-                {
-                    
-                }
-                else // iOS
-                {
-                    
-                }
-            }
-            else // process hlsl or glsl
-            {
-                bool canConvertToMetalSL = false;
-                switch (inOp.Lang) {
-                    case k3d::EShLang_ESSL:
-                    case k3d::EShLang_GLSL:
-                    case k3d::EShLang_HLSL:
-                    case k3d::EShLang_VkGLSL:
-                        canConvertToMetalSL = true;
-                        break;
-                    default:
-                        break;
-                }
-                if (canConvertToMetalSL)
-                {
-                    EShMessages messages = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules);
-                    switch(inOp.Lang)
-                    {
-                        case k3d::EShLang_ESSL:
-                        case k3d::EShLang_GLSL:
-                        case k3d::EShLang_VkGLSL:
-                            break;
-                        case k3d::EShLang_HLSL:
-                            messages = (EShMessages)(EShMsgVulkanRules | EShMsgSpvRules | EShMsgReadHlsl);
-                            break;
-                        default:
-                            break;
-                    }
-                    glslang::TProgram& program = *new glslang::TProgram;
-                    TBuiltInResource Resources;
-                    initResources(Resources);
-                    
-                    const char *shaderStrings[1];
-                    EShLanguage stage = findLanguage(inOp.Stage);
-                    glslang::TShader* shader = new glslang::TShader(stage);
-                    
-                    shaderStrings[0] = src.CStr();
-                    shader->setStrings(shaderStrings, 1);
-                    shader->setEntryPoint(inOp.EntryFunction.CStr());
-                    
-                    if (!shader->parse(&Resources, 100, false, messages)) {
-                        puts(shader->getInfoLog());
-                        puts(shader->getInfoDebugLog());
-                        return k3d::shc::E_Failed;
-                    }
-                    program.addShader(shader);
-                    if (!program.link(messages)) {
-                        puts(program.getInfoLog());
-                        puts(program.getInfoDebugLog());
-                        return k3d::shc::E_Failed;
-                    }
-                    std::vector<unsigned int> spirv;
-                    glslang::GlslangToSpv(*program.getIntermediate(stage), spirv);
 
-                    if(program.buildReflection())
-                    {
-                        ExtractAttributeData(program, bundle.Attributes);
-                        ExtractUniformData(inOp.Stage, program, bundle.BindingTable);
-                    }
-                    else
-                    {
-                        return k3d::shc::E_Failed;
-                    }
-                    uint32 bufferLoc = 0;
-                    std::vector<spirv_cross::MSLVertexAttr> vertAttrs;
-                    for(auto & attr : bundle.Attributes)
-                    {
-                        spirv_cross::MSLVertexAttr vAttrib;
-                        vAttrib.location = attr.VarLocation;
-                        vAttrib.msl_buffer = attr.VarBindingPoint;
-                        vertAttrs.push_back(vAttrib);
-                        bufferLoc = attr.VarBindingPoint;
-                    }
-                    std::vector<spirv_cross::MSLResourceBinding> resBindings;
-                    for(auto & binding : bundle.BindingTable.Bindings)
-                    {
-                        if(binding.VarType == EBindType::EBlock)
-                        {
-                            bufferLoc ++;
-                            spirv_cross::MSLResourceBinding resBind;
-                            resBind.stage = rhiShaderStageToSpvModel(binding.VarStage);
-                            resBind.desc_set = 0;
-                            resBind.binding = binding.VarNumber;
-                            resBind.msl_buffer = bufferLoc;
-                            resBindings.push_back(resBind);
-                        }
-                    }
-                    auto metalc = make_unique<spirv_cross::CompilerMSL>(spirv);
-                    spirv_cross::MSLConfiguration config;
-                    config.flip_vert_y = false;
-                    config.flip_frag_y = false;
-                    config.entry_point_name = inOp.EntryFunction.CStr();
-                    auto result = metalc->compile(config, &vertAttrs, &resBindings);
-                    if(m_IsMac)
-                    {
-                        auto ret = mtlCompile(result, bundle.RawData);
-                        if(ret == E_Failed)
-                            return ret;
-                        bundle.Desc = inOp;
-                        bundle.Desc.Format = k3d::EShFmt_ByteCode;
-                        bundle.Desc.Lang = k3d::EShLang_MetalSL;
-                    }
-                    else
-                    {
-                        bundle.RawData = { result.c_str() };
-                        bundle.Desc = inOp;
-                        bundle.Desc.Format = k3d::EShFmt_Text;
-                        bundle.Desc.Lang = k3d::EShLang_MetalSL;
-                    }
-                }
-            }
-        }
-        else
+  NGFXShaderCompileResult MetalCompiler::Compile(String const& src, NGFXShaderDesc const& inOp, NGFXShaderBundle& bundle)
+  {
+    if (inOp.Format == NGFX_SHADER_FORMAT_TEXT)
+    {
+      if (inOp.Lang == NGFX_SHADER_LANG_METALSL)
+      {
+        if (m_IsMac)
         {
-            if(inOp.Lang == k3d::EShLang_MetalSL)
-            {
-                
-            }
-            else
-            {
-                
-            }
         }
-        return E_Ok;
+        else // iOS
+        {
+        }
+      }
+      else // process hlsl or glsl
+      {
+        bool canConvertToMetalSL = false;
+        switch (inOp.Lang)
+        {
+        case NGFX_SHADER_LANG_ESSL:
+        case NGFX_SHADER_LANG_GLSL:
+        case NGFX_SHADER_LANG_HLSL:
+        case NGFX_SHADER_LANG_VKGLSL:
+          canConvertToMetalSL = true;
+          break;
+        default:
+          break;
+        }
+        if (canConvertToMetalSL)
+        {
+          EShMessages messages = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules);
+          switch (inOp.Lang)
+          {
+          case NGFX_SHADER_LANG_ESSL:
+          case NGFX_SHADER_LANG_GLSL:
+          case NGFX_SHADER_LANG_VKGLSL:
+            break;
+          case NGFX_SHADER_LANG_HLSL:
+            messages = (EShMessages)(EShMsgVulkanRules | EShMsgSpvRules | EShMsgReadHlsl);
+            break;
+          default:
+            break;
+          }
+          glslang::TProgram& program = *new glslang::TProgram;
+          TBuiltInResource Resources;
+          initResources(Resources);
+
+          const char* shaderStrings[1];
+          EShLanguage stage = findLanguage(inOp.Stage);
+          glslang::TShader* shader = new glslang::TShader(stage);
+
+          shaderStrings[0] = src.CStr();
+          shader->setStrings(shaderStrings, 1);
+          shader->setEntryPoint(inOp.EntryFunction.CStr());
+
+          if (!shader->parse(&Resources, 100, false, messages))
+          {
+            puts(shader->getInfoLog());
+            puts(shader->getInfoDebugLog());
+            return NGFX_SHADER_COMPILE_FAILED;
+          }
+          program.addShader(shader);
+          if (!program.link(messages))
+          {
+            puts(program.getInfoLog());
+            puts(program.getInfoDebugLog());
+            return NGFX_SHADER_COMPILE_FAILED;
+          }
+          vector<unsigned int> spirv;
+          GlslangToSpv(*program.getIntermediate(stage), spirv);
+
+          if (program.buildReflection())
+          {
+            ExtractAttributeData(program, bundle.Attributes);
+            ExtractUniformData(inOp.Stage, program, bundle.BindingTable);
+          }
+          else
+          {
+            return NGFX_SHADER_COMPILE_FAILED;
+          }
+          uint32 bufferLoc = 0;
+          vector<spirv_cross::MSLVertexAttr> vertAttrs;
+          for (auto& attr : bundle.Attributes)
+          {
+            spirv_cross::MSLVertexAttr vAttrib;
+            vAttrib.location = attr.VarLocation;
+            vAttrib.msl_buffer = attr.VarBindingPoint;
+            vertAttrs.push_back(vAttrib);
+            bufferLoc = attr.VarBindingPoint;
+          }
+          vector<spirv_cross::MSLResourceBinding> resBindings;
+          for (auto& binding : bundle.BindingTable.Bindings)
+          {
+            if (binding.VarType == NGFX_SHADER_BIND_BLOCK)
+            {
+              bufferLoc ++;
+              spirv_cross::MSLResourceBinding resBind;
+              resBind.stage = rhiShaderStageToSpvModel(binding.VarStage);
+              resBind.desc_set = 0;
+              resBind.binding = binding.VarNumber;
+              resBind.msl_buffer = bufferLoc;
+              resBindings.push_back(resBind);
+            }
+          }
+          auto metalc = make_unique<spirv_cross::CompilerMSL>(spirv);
+          spirv_cross::MSLConfiguration config;
+          config.flip_vert_y = false;
+          config.flip_frag_y = false;
+          config.entry_point_name = inOp.EntryFunction.CStr();
+          auto result = metalc->compile(config, &vertAttrs, &resBindings);
+          if (m_IsMac)
+          {
+            auto ret = mtlCompile(result, bundle.RawData);
+            if (ret == NGFX_SHADER_COMPILE_FAILED)
+              return ret;
+            bundle.Desc = inOp;
+            bundle.Desc.Format = NGFX_SHADER_FORMAT_BYTE_CODE;
+            bundle.Desc.Lang = NGFX_SHADER_LANG_METALSL;
+          }
+          else
+          {
+            bundle.RawData = {result.c_str()};
+            bundle.Desc = inOp;
+            bundle.Desc.Format = NGFX_SHADER_FORMAT_TEXT;
+            bundle.Desc.Lang = NGFX_SHADER_LANG_METALSL;
+          }
+        }
+      }
     }
+    else
+    {
+      if (inOp.Lang == NGFX_SHADER_LANG_METALSL)
+      {
+      }
+      else
+      {
+      }
+    }
+    return NGFX_SHADER_COMPILE_OK;
+  }
     
     const char*
     MetalCompiler::GetVersion()
@@ -176,7 +174,7 @@ namespace k3d
         return "Metal";
     }
     
-    EResult mtlCompile(string const& source, String & metalIR)
+    NGFXShaderCompileResult mtlCompile(string const& source, String & metalIR)
     {
 #if K3DPLATFORM_OS_MAC 
         MD5 md5(source);
@@ -196,13 +194,13 @@ namespace k3d
         auto ret = system(ccmd.c_str());
         if(ret)
         {
-            return E_Failed;
+            return NGFX_SHADER_COMPILE_FAILED;
         }
         auto lcmd = mlink + " -split-module -o " + tmpLib + " " + tmpAr;
         ret = system(lcmd.c_str());
         if(ret)
         {
-            return E_Failed;
+            return NGFX_SHADER_COMPILE_FAILED;
         }
         Os::MemMapFile bcFile;
         bcFile.Open(tmpLib.c_str(), IORead);
@@ -210,6 +208,6 @@ namespace k3d
         bcFile.Close();
         //Os::Remove(intermediate.c_str());
 #endif
-        return E_Ok;
+        return NGFX_SHADER_COMPILE_OK;
     }
 }

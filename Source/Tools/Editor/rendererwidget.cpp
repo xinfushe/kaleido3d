@@ -30,14 +30,14 @@ void RendererWidget::init()
   RHI->Initialize("Widget", false);
   RHI->Start();
   auto pFactory = RHI->GetFactory();
-  DynArray<DeviceRef> Devices;
+  DynArray<NGFXDeviceRef> Devices;
   pFactory->EnumDevices(Devices);
   Device = Devices[0];
 
-  Queue = Device->CreateCommandQueue(k3d::ECMD_Graphics);
+  Queue = Device->CreateCommandQueue(NGFX_COMMAND_GRAPHICS);
 
   k3d::SwapChainDesc Desc = { 
-    k3d::EPF_RGBA8Unorm_sRGB,
+    NGFX_PIXEL_FORMAT_RGBA8_UNORM_SRGB,
     width(),
     height(),
     2 };
@@ -59,9 +59,9 @@ void RendererWidget::resizeEvent(QResizeEvent * pEvent)
 
 void RendererWidget::tickRender()
 {
-  auto cmdBuffer = Queue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
+  auto cmdBuffer = Queue->ObtainCommandBuffer(NGFX_COMMAND_USAGE_ONE_SHOT);
   auto presentImage = Swapchain->GetCurrentTexture();
-  cmdBuffer->Transition(presentImage, k3d::ERS_Present);
+  cmdBuffer->Transition(presentImage, NGFX_RESOURCE_STATE_PRESENT);
   cmdBuffer->Present(Swapchain, nullptr);
   cmdBuffer->Commit(FrameFence);
 }

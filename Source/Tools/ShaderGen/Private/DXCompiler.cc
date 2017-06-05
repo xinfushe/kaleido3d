@@ -11,28 +11,28 @@ namespace k3d {
 
 	using namespace k3d::shc;
 
-	EDataType D3DSigTypeConvert(const D3D12_SIGNATURE_PARAMETER_DESC& desc)
+	NGFXShaderDataType D3DSigTypeConvert(const D3D12_SIGNATURE_PARAMETER_DESC& desc)
 	{
-		EDataType result = EDataType::EUnknown;
+		NGFXShaderDataType result = NGFXShaderDataType::NGFX_SHADER_VAR_UNKNOWN;
 		switch (desc.ComponentType)
 		{
 		case D3D_REGISTER_COMPONENT_SINT32:
 		{
 			if (desc.Mask == 1)
 			{
-				result = EDataType::EInt; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_INT; break;
 			}
 			else if (desc.Mask <= 3)
 			{
-				result = EDataType::EInt2; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_INT2; break;
 			}
 			else if (desc.Mask <= 7)
 			{
-				result = EDataType::EInt3; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_INT3; break;
 			}
 			else if (desc.Mask <= 15)
 			{
-				result = EDataType::EInt4; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_INT4; break;
 			}
 		}
 		break;
@@ -41,19 +41,19 @@ namespace k3d {
 		{
 			if (desc.Mask == 1)
 			{
-				result = EDataType::EUInt; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_UINT; break;
 			}
 			else if (desc.Mask <= 3)
 			{
-				result = EDataType::EUInt2; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_UINT2; break;
 			}
 			else if (desc.Mask <= 7)
 			{
-				result = EDataType::EUInt3; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_UINT3; break;
 			}
 			else if (desc.Mask <= 15)
 			{
-				result = EDataType::EUInt4; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_UINT4; break;
 			}
 		}
 		break;
@@ -62,19 +62,19 @@ namespace k3d {
 		{
 			if (desc.Mask == 1)
 			{
-				result = EDataType::EFloat; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT; break;
 			}
 			else if (desc.Mask <= 3)
 			{
-				result = EDataType::EFloat2; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT2; break;
 			}
 			else if (desc.Mask <= 7)
 			{
-				result = EDataType::EFloat3; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT3; break;
 			}
 			else if (desc.Mask <= 15)
 			{
-				result = EDataType::EFloat4; break;
+				result = NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT4; break;
 			}
 		}
 		break;
@@ -83,28 +83,28 @@ namespace k3d {
 		return result;
 	}
 
-	const char * GetSMModel(k3d::EShaderType const& type)
+	const char * GetSMModel(k3d::NGFXShaderType const& type)
 	{
 		switch (type)
 		{
-		case k3d::ES_Vertex:
+		case k3d::NGFX_SHADER_TYPE_VERTEX:
 			return "vs_5_1";
-		case k3d::ES_Fragment:
+		case k3d::NGFX_SHADER_TYPE_FRAGMENT:
 			return "ps_5_1";
-		case k3d::ES_Compute:
+		case k3d::NGFX_SHADER_TYPE_COMPUTE:
 			return "cs_5_1";
-		case k3d::ES_Hull:
+		case k3d::NGFX_SHADER_TYPE_HULL:
 			return "hs_5_1";
-		case k3d::ES_Geometry:
+		case k3d::NGFX_SHADER_TYPE_GEOMETRY:
 			return "gs_5_1";
 		default:
 			return "";
 		}
 	}
 
-	EResult DXCompiler::Compile(String const & src, k3d::ShaderDesc const & inOp, k3d::ShaderBundle & bundle)
+	NGFXShaderCompileResult DXCompiler::Compile(String const & src, k3d::NGFXShaderDesc const & inOp, k3d::ShaderBundle & bundle)
 	{
-		if (inOp.Format == k3d::EShFmt_Text && inOp.Lang == k3d::EShLang_HLSL && inOp.Profile == k3d::EShProfile_Modern)
+		if (inOp.Format == k3d::NGFX_SHADER_FORMAT_TEXT && inOp.Lang == k3d::NGFX_SHADER_LANG_HLSL && inOp.Profile == k3d::NGFX_SHADER_PROFILE_MODERN)
 		{
 
 #if defined(_DEBUG)
@@ -121,7 +121,7 @@ namespace k3d {
 				dwShaderFlags, 0,
 				ShaderBlob.GetAddressOf(), ErrorBlob.GetAddressOf());
 			bundle.Desc = inOp;
-			bundle.Desc.Format = k3d::EShFmt_ByteCode;
+			bundle.Desc.Format = k3d::NGFX_SHADER_FORMAT_BYTE_CODE;
 			bundle.RawData = { ShaderBlob->GetBufferPointer(), ShaderBlob->GetBufferSize() };
 
 			ComPtr<ID3D12ShaderReflection> reflection;
@@ -162,10 +162,10 @@ namespace k3d {
 				}
 			}
 			else {
-				return E_Failed;
+				return NGFX_SHADER_COMPILE_FAILED;
 			}
 		}
-		return E_Ok;
+		return NGFX_SHADER_COMPILE_OK;
 	}
 
 	const char * DXCompiler::GetVersion()

@@ -3,9 +3,9 @@
 #define __Types_H__
 
 #if K3DPLATFORM_OS_IOS
-    #include "stdint.h"
+  #include "stdint.h"
 #else
-    #include <cstdint>
+  #include <stdint.h>
 #endif
 //#include <float.h>
 
@@ -20,7 +20,9 @@ typedef uint32_t  uint32;
 typedef uint64_t  uint64;
 typedef unsigned char kByte;
 
+#if __cplusplus
 namespace k3d {
+#endif
 #if K3DPLATFORM_OS_WIN
     typedef wchar_t kchar;
     #define KT(quote) L##quote
@@ -28,6 +30,9 @@ namespace k3d {
     #define KT(quote) quote
     typedef char	kchar;
 #endif
+
+#if __cplusplus
 }
+#endif
 
 #endif

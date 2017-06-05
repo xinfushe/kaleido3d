@@ -5,7 +5,7 @@
 K3D_VK_BEGIN
 
 namespace {
-VkShaderStageFlagBits g_ShaderType[EShaderType::ShaderTypeNum] = {
+VkShaderStageFlagBits g_ShaderType[] = {
   VK_SHADER_STAGE_FRAGMENT_BIT,
   VK_SHADER_STAGE_VERTEX_BIT,
   VK_SHADER_STAGE_GEOMETRY_BIT,
@@ -14,7 +14,7 @@ VkShaderStageFlagBits g_ShaderType[EShaderType::ShaderTypeNum] = {
   VK_SHADER_STAGE_COMPUTE_BIT
 };
 
-VkPrimitiveTopology g_PrimitiveTopology[EPrimitiveType::PrimTypeNum] = {
+VkPrimitiveTopology g_PrimitiveTopology[NGFXPrimitiveType::NGFX_PRIMITIVE_NUM] = {
   VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
   VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
   VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
@@ -26,15 +26,15 @@ VkVertexInputRate g_InputRates[] = {
   VK_VERTEX_INPUT_RATE_INSTANCE,
 };
 
-VkCullModeFlagBits g_CullMode[RasterizerState::CullModeNum] =
+VkCullModeFlagBits g_CullMode[] =
   { VK_CULL_MODE_NONE, VK_CULL_MODE_FRONT_BIT, VK_CULL_MODE_BACK_BIT };
 
-VkPolygonMode g_FillMode[RasterizerState::EFillMode::FillModeNum] = {
+VkPolygonMode g_FillMode[] = {
   VK_POLYGON_MODE_LINE,
   VK_POLYGON_MODE_FILL
 };
 
-VkStencilOp g_StencilOp[DepthStencilState::StencilOpNum] = {
+VkStencilOp g_StencilOp[] = {
   VK_STENCIL_OP_KEEP,
   VK_STENCIL_OP_ZERO,
   VK_STENCIL_OP_REPLACE,
@@ -43,18 +43,18 @@ VkStencilOp g_StencilOp[DepthStencilState::StencilOpNum] = {
   VK_STENCIL_OP_DECREMENT_AND_CLAMP
 };
 
-VkBlendOp g_BlendOps[BlendState::BlendOpNum] = {
+VkBlendOp g_BlendOps[] = {
   VK_BLEND_OP_ADD,
   VK_BLEND_OP_SUBTRACT,
 };
 
-VkBlendFactor g_Blend[BlendState::BlendTypeNum] = {
+VkBlendFactor g_Blend[] = {
   VK_BLEND_FACTOR_ZERO,      VK_BLEND_FACTOR_ONE,
   VK_BLEND_FACTOR_SRC_COLOR, VK_BLEND_FACTOR_DST_COLOR,
   VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_DST_ALPHA
 };
 
-VkCompareOp g_ComparisonFunc[DepthStencilState::ComparisonFuncNum] = {
+VkCompareOp g_ComparisonFunc[] = {
   VK_COMPARE_OP_NEVER,
   VK_COMPARE_OP_LESS,
   VK_COMPARE_OP_EQUAL,
@@ -65,19 +65,19 @@ VkCompareOp g_ComparisonFunc[DepthStencilState::ComparisonFuncNum] = {
   VK_COMPARE_OP_ALWAYS
 };
 /*
-EPF_RGBA16Uint,
-EPF_RGBA32Float,
-EPF_RGBA8Unorm,
-EPF_RGBA8Unorm_sRGB,
-EPF_R11G11B10Float,
-EPF_D32Float,
-EPF_RGB32Float,
-EPF_RGB8Unorm,
-EPF_BGRA8Unorm, // Apple Metal Layer uses it as default pixel format
-EPF_BGRA8Unorm_sRGB,
-EPF_RGBA16Float,
+NGFX_PIXEL_FORMAT_RGBA16_UINT,
+NGFX_PIXEL_FORMAT_RGBA32_FLOAT,
+NGFX_PIXEL_FORMAT_RGBA8_UNORM,
+NGFX_PIXEL_FORMAT_RGBA8_UNORM_SRGB,
+NGFX_PIXEL_FORMAT_R11_G11_B10_FLOAT,
+NGFX_PIXEL_FORMAT_D32_FLOAT,
+NGFX_PIXEL_FORMAT_RGB32_FLOAT,
+NGFX_PIXEL_FORMAT_RGB8_UNORM,
+NGFX_PIXEL_FORMAT_BGRA8_UNORM, // Apple Metal Layer uses it as default pixel format
+NGFX_PIXEL_FORMAT_BGRA8_UNORM_SRGB,
+NGFX_PIXEL_FORMAT_RGBA16_FLOAT,
 */
-VkFormat g_FormatTable[EPixelFormat::PixelFormatNum] = {
+VkFormat g_FormatTable[NGFXPixelFormat::NGFX_PIXEL_FORMAT_NUM] = {
   VK_FORMAT_R16G16B16A16_UINT,       VK_FORMAT_R32G32B32A32_SFLOAT,
   VK_FORMAT_R8G8B8A8_UNORM,          VK_FORMAT_R8G8B8A8_SNORM,
   VK_FORMAT_B10G11R11_UFLOAT_PACK32, VK_FORMAT_D32_SFLOAT,
@@ -112,13 +112,13 @@ VkImageLayout g_ResourceState[] = {
 //			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT = 0x00000080,
 //			VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT = 0x00000100,
 /**
- * EGVT_VBV, // For VertexBuffer
- * EGVT_IBV, // For IndexBuffer
- * EGVT_CBV, // For ConstantBuffer
- * EGVT_SRV, // For Texture
- * EGVT_UAV, // For Buffer
- * EGVT_RTV,
- * EGVT_DSV,
+ * NGFX_RESOURCE_VERTEX_BUFFER_VIEW, // For VertexBuffer
+ * NGFX_RESOURCE_INDEX_BUFFER_VIEW, // For IndexBuffer
+ * NGFX_RESOURCE_CONSTANT_BUFFER_VIEW, // For ConstantBuffer
+ * NGFX_RESOURCE_SHADER_RESOURCE_VIEW, // For Texture
+ * NGFX_RESOURCE_UNORDERED_ACCESS_VIEW, // For Buffer
+ * NGFX_RESOURCE_RENDER_TARGET_VIEW,
+ * NGFX_RESOURCE_DEPTH_STENCIL_VIEW,
  * EGVT_Sampler,
  * EGVT_SOV,
  */
@@ -133,7 +133,7 @@ VkFlags g_ResourceViewFlag[] = { 0,
                                  0,
                                  0 };
 
-//@see  SamplerState::EFilterMethod
+//@see  SamplerState::NGFXFilterMethod
 VkFilter g_Filters[] = { VK_FILTER_NEAREST, VK_FILTER_LINEAR };
 
 VkSamplerMipmapMode g_MipMapModes[] = {
@@ -141,7 +141,7 @@ VkSamplerMipmapMode g_MipMapModes[] = {
   VK_SAMPLER_MIPMAP_MODE_LINEAR,
 };
 
-// @see  SamplerState::ETextureAddressMode
+// @see  SamplerState::NGFXAddressMode
 //	Wrap,
 //	Mirror, // Repeat
 //	Clamp,
@@ -164,43 +164,43 @@ VkAttachmentStoreOp g_StoreAction[] = {
   VK_ATTACHMENT_STORE_OP_DONT_CARE,
 };
 
-EPixelFormat
+NGFXPixelFormat
 ConvertToRHIFormat(VkFormat format)
 {
   switch (format) {
     case VK_FORMAT_R16G16B16A16_UINT:
-      return EPF_RGBA16Uint;
+      return NGFX_PIXEL_FORMAT_RGBA16_UINT;
     case VK_FORMAT_R8G8B8A8_UNORM:
-      return EPF_RGBA8Unorm;
+      return NGFX_PIXEL_FORMAT_RGBA8_UNORM;
     case VK_FORMAT_R8G8B8A8_SNORM:
-      return EPF_RGBA8Unorm_sRGB;
+      return NGFX_PIXEL_FORMAT_RGBA8_UNORM_SRGB;
     case VK_FORMAT_B8G8R8A8_UNORM:
-      return EPF_BGRA8Unorm;
+      return NGFX_PIXEL_FORMAT_BGRA8_UNORM;
     case VK_FORMAT_D32_SFLOAT:
-      return EPF_D32Float;
+      return NGFX_PIXEL_FORMAT_D32_FLOAT;
     case VK_FORMAT_B8G8R8A8_SNORM:
-      return EPF_BGRA8Unorm_sRGB;
+      return NGFX_PIXEL_FORMAT_BGRA8_UNORM_SRGB;
   }
-  return PixelFormatNum;
+  return NGFX_PIXEL_FORMAT_NUM;
 }
 
-VkImageViewType ConvertFromTextureType(EGpuResourceType const& Type)
+VkImageViewType ConvertFromTextureType(NGFXResourceType const& Type)
 {
   switch (Type)
   {
-    case EGT_Texture1D:
+    case NGFX_TEXTURE_1D:
         return VK_IMAGE_VIEW_TYPE_1D;
-    case EGT_Texture1DArray:
+    case NGFX_TEXTURE_1D_ARRAY:
       return VK_IMAGE_VIEW_TYPE_1D_ARRAY;
-    case EGT_Texture2DMS:
-    case EGT_Texture2D:
+    case NGFX_TEXTURE_2DMS:
+    case NGFX_TEXTURE_2D:
       return VK_IMAGE_VIEW_TYPE_2D;
-    case EGT_Texture2DMSArray:
-    case EGT_Texture2DArray:
+    case NGFX_TEXTURE_2DMS_ARRAY:
+    case NGFX_TEXTURE_2D_ARRAY:
       return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-    case EGT_Texture3D:
+    case NGFX_TEXTURE_3D:
       return VK_IMAGE_VIEW_TYPE_3D;
-    case EGT_TextureCube:
+    case NGFX_TEXTURE_CUBE:
       return VK_IMAGE_VIEW_TYPE_CUBE;
   }
   return VK_IMAGE_VIEW_TYPE_MAX_ENUM;

@@ -9,9 +9,9 @@ namespace k3d
     public:
         MetalCompiler();
         ~MetalCompiler() override;
-        k3d::shc::EResult	Compile(String const& src,
-                                    k3d::ShaderDesc const& inOp,
-                                    k3d::ShaderBundle & bundle) override;
+        k3d::NGFXShaderCompileResult	Compile(String const& src,
+                                    k3d::NGFXShaderDesc const& inOp,
+                                    k3d::NGFXShaderBundle & bundle) override;
         const char *        GetVersion();
     
     private:

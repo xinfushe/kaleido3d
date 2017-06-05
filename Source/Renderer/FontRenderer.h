@@ -43,12 +43,12 @@ private:
 class CharTexture
 {
 public:
-  CharTexture(k3d::DeviceRef device, TextQuad const& quad);
+  CharTexture(k3d::NGFXDeviceRef device, TextQuad const& quad);
   ~CharTexture();
-  k3d::TextureRef GetTexture() const { return m_Texture; }
+  k3d::NGFXTextureRef GetTexture() const { return m_Texture; }
 
 private:
-  k3d::TextureRef m_Texture;
+  k3d::NGFXTextureRef m_Texture;
 };
 
 class CharRenderer
@@ -57,7 +57,7 @@ public:
   CharRenderer();
   ~CharRenderer();
 
-  void InitVertexBuffers(k3d::DeviceRef const& device);
+  void InitVertexBuffers(k3d::NGFXDeviceRef const& device);
 
   // text atlas?
 
@@ -67,20 +67,20 @@ private:
   static float s_CharTexCoords[];
 
 private:
-  k3d::GpuResourceRef m_VertexBuffer;
-  k3d::GpuResourceRef m_IndexBuffer;
+  k3d::NGFXResourceRef m_VertexBuffer;
+  k3d::NGFXResourceRef m_IndexBuffer;
 };
 
 class FontRenderer
 {
 public:
-  explicit FontRenderer(k3d::DeviceRef const& device);
+  explicit FontRenderer(k3d::NGFXDeviceRef const& device);
   ~FontRenderer();
-  void InitPSO(k3d::RenderPassRef pRenderPass);
+  void InitPSO(k3d::NGFXRenderpassRef pRenderPass);
   void Draw(k3d::String const& Text, kMath::Vec3f Position);
 
 private:
-  k3d::DeviceRef m_Device;
+  k3d::NGFXDeviceRef m_Device;
   k3d::RenderPipelineStateRef m_TextRenderPSO;
   FontManager m_FontManager;
   std::unordered_map<char, CharTexture> m_TexCache;

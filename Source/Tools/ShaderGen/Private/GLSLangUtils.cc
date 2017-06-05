@@ -3,6 +3,7 @@
 #include <glslang/MachineIndependent/gl_types.h>
 
 using namespace ::glslang;
+using namespace ::k3d;
 
 void sInitializeGlSlang()
 {
@@ -26,89 +27,86 @@ void sFinializeGlSlang()
 #endif
 }
 
-k3d::shc::EDataType glTypeToRHIAttribType(int glType)
+NGFXShaderDataType glTypeToRHIAttribType(int glType)
 {
-	using namespace k3d::shc;
-	switch (glType)
-	{
-	case GL_FLOAT:
-		return EDataType::EFloat;
-	case GL_FLOAT_VEC2:
-		return EDataType::EFloat2;
-	case GL_FLOAT_VEC3:
-		return EDataType::EFloat3;
-	case GL_FLOAT_VEC4:
-		return EDataType::EFloat4;
-	case GL_INT:
-		return EDataType::EInt;
-	case GL_INT_VEC2:
-		return EDataType::EInt2;
-	case GL_INT_VEC3:
-		return EDataType::EInt3;
-	case GL_INT_VEC4:
-		return EDataType::EInt4;
-	case GL_UNSIGNED_INT:
-		return EDataType::EUInt;
-	case GL_UNSIGNED_INT_VEC2:
-		return EDataType::EUInt2;
-	case GL_UNSIGNED_INT_VEC3:
-		return EDataType::EUInt3;
-	case GL_UNSIGNED_INT_VEC4:
-		return EDataType::EUInt4;
-	}
-	return EDataType::EUnknown;
+  switch (glType)
+  {
+  case GL_FLOAT:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT;
+  case GL_FLOAT_VEC2:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT2;
+  case GL_FLOAT_VEC3:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT3;
+  case GL_FLOAT_VEC4:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT4;
+  case GL_INT:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_INT;
+  case GL_INT_VEC2:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_INT2;
+  case GL_INT_VEC3:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_INT3;
+  case GL_INT_VEC4:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_INT4;
+  case GL_UNSIGNED_INT:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_UINT;
+  case GL_UNSIGNED_INT_VEC2:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_UINT2;
+  case GL_UNSIGNED_INT_VEC3:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_UINT3;
+  case GL_UNSIGNED_INT_VEC4:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_UINT4;
+  }
+  return NGFXShaderDataType::NGFX_SHADER_VAR_UNKNOWN;
 }
 
 
-k3d::shc::EDataType glTypeToRHIUniformType(int glType)
+NGFXShaderDataType glTypeToRHIUniformType(int glType)
 {
-	using namespace k3d::shc;
-	switch (glType)
-	{
-	case GL_FLOAT:
-		return EDataType::EFloat;
-	case GL_FLOAT_VEC2:
-		return EDataType::EFloat2;
-	case GL_FLOAT_VEC3:
-		return EDataType::EFloat3;
-	case GL_FLOAT_VEC4:
-		return EDataType::EFloat4;
-	case GL_INT:
-		return EDataType::EInt;
-	case GL_INT_VEC2:
-		return EDataType::EInt2;
-	case GL_INT_VEC3:
-		return EDataType::EInt3;
-	case GL_INT_VEC4:
-		return EDataType::EInt4;
-	case GL_UNSIGNED_INT:
-		return EDataType::EUInt;
-	case GL_UNSIGNED_INT_VEC2:
-		return EDataType::EUInt2;
-	case GL_UNSIGNED_INT_VEC3:
-		return EDataType::EUInt3;
-	case GL_UNSIGNED_INT_VEC4:
-		return EDataType::EUInt4;
-	}
-	return EDataType::EUnknown;
+  switch (glType)
+  {
+  case GL_FLOAT:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT;
+  case GL_FLOAT_VEC2:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT2;
+  case GL_FLOAT_VEC3:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT3;
+  case GL_FLOAT_VEC4:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT4;
+  case GL_INT:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_INT;
+  case GL_INT_VEC2:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_INT2;
+  case GL_INT_VEC3:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_INT3;
+  case GL_INT_VEC4:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_INT4;
+  case GL_UNSIGNED_INT:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_UINT;
+  case GL_UNSIGNED_INT_VEC2:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_UINT2;
+  case GL_UNSIGNED_INT_VEC3:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_UINT3;
+  case GL_UNSIGNED_INT_VEC4:
+    return NGFXShaderDataType::NGFX_SHADER_VAR_UINT4;
+  }
+  return NGFXShaderDataType::NGFX_SHADER_VAR_UNKNOWN;
 }
 
-k3d::shc::EDataType glslangDataTypeToRHIDataType(const glslang::TType & type)
+NGFXShaderDataType glslangDataTypeToRHIDataType(const TType& type)
 {
-	using namespace k3d::shc;
 	switch (type.getBasicType()) {
 	case EbtSampler:
   {
     switch (type.getQualifier().layoutFormat)
     {
     case ElfRgba32f:
-      return EDataType::EFloat4;
+      return NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT4;
     }
   }
 	case EbtStruct:
 	case EbtBlock:
 	case EbtVoid:
-		return EDataType::EUnknown;
+		return NGFXShaderDataType::NGFX_SHADER_VAR_UNKNOWN;
 	default:
 		break;
 	}
@@ -116,18 +114,18 @@ k3d::shc::EDataType glslangDataTypeToRHIDataType(const glslang::TType & type)
 	if (type.isVector()) {
 		int offset = type.getVectorSize() - 2;
 		switch (type.getBasicType()) {
-		case EbtFloat:      return (EDataType)((int)EDataType::EFloat2 + offset);
+		case EbtFloat:      return (NGFXShaderDataType)((int)NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT2 + offset);
 		//case EbtDouble:     return GL_DOUBLE_VEC2 + offset;
 #ifdef AMD_EXTENSIONS
 		//case EbtFloat16:    return GL_FLOAT16_VEC2_NV + offset;
 #endif
-		case EbtInt:        return (EDataType)((int)EDataType::EInt2 + offset);
-		case EbtUint:       return (EDataType)((int)EDataType::EUInt2 + offset);
+		case EbtInt:        return (NGFXShaderDataType)((int)NGFXShaderDataType::NGFX_SHADER_VAR_INT2 + offset);
+		case EbtUint:       return (NGFXShaderDataType)((int)NGFXShaderDataType::NGFX_SHADER_VAR_UINT2 + offset);
 		//case EbtInt64:      return GL_INT64_ARB + offset;
 		//case EbtUint64:     return GL_UNSIGNED_INT64_ARB + offset;
-		case EbtBool:       return (EDataType)((int)EDataType::EBool2 + offset);
+		case EbtBool:       return (NGFXShaderDataType)((int)NGFXShaderDataType::NGFX_SHADER_VAR_BOOL2 + offset);
 		//case EbtAtomicUint: return GL_UNSIGNED_INT_ATOMIC_COUNTER + offset;
-		default:            return EDataType::EUnknown;
+		default:            return NGFXShaderDataType::NGFX_SHADER_VAR_UNKNOWN;
 		}
 	}
 	if (type.isMatrix()) 
@@ -140,58 +138,57 @@ k3d::shc::EDataType glslangDataTypeToRHIDataType(const glslang::TType & type)
 			case 2:
 				switch (type.getMatrixRows())
 				{
-				case 2:    return EDataType::EMat2;
-				case 3:    return EDataType::EMat2x3;
-				case 4:    return EDataType::EMat2x4;
-				default:   return EDataType::EUnknown;
+				case 2:    return NGFXShaderDataType::NGFX_SHADER_VAR_MAT2;
+				case 3:    return NGFXShaderDataType::NGFX_SHADER_VAR_MAT2X3;
+				case 4:    return NGFXShaderDataType::NGFX_SHADER_VAR_MAT2X4;
+				default:   return NGFXShaderDataType::NGFX_SHADER_VAR_UNKNOWN;
 				}
 			case 3:
 				switch (type.getMatrixRows())
 				{
-				case 2:    return EDataType::EMat3x2;
-				case 3:    return EDataType::EMat3;
-				case 4:    return EDataType::EMat3x4;
-				default:   return EDataType::EUnknown;
+				case 2:    return NGFXShaderDataType::NGFX_SHADER_VAR_MAT3X2;
+				case 3:    return NGFXShaderDataType::NGFX_SHADER_VAR_MAT3;
+				case 4:    return NGFXShaderDataType::NGFX_SHADER_VAR_MAT3X4;
+				default:   return NGFXShaderDataType::NGFX_SHADER_VAR_UNKNOWN;
 				}
 			case 4:
 				switch (type.getMatrixRows())
 				{
-				case 2:    return EDataType::EMat4x2;
-				case 3:    return EDataType::EMat4x3;
-				case 4:    return EDataType::EMat4;
-				default:   return EDataType::EUnknown;
+				case 2:    return NGFXShaderDataType::NGFX_SHADER_VAR_MAT4X2;
+				case 3:    return NGFXShaderDataType::NGFX_SHADER_VAR_MAT4X3;
+				case 4:    return NGFXShaderDataType::NGFX_SHADER_VAR_MAT4;
+				default:   return NGFXShaderDataType::NGFX_SHADER_VAR_UNKNOWN;
 				}
 			}
 		}
 	}
 	if (type.getVectorSize() == 1) {
 		switch (type.getBasicType()) {
-		case EbtFloat:      return EDataType::EFloat;
-		case EbtInt:        return EDataType::EInt;
-		case EbtUint:       return EDataType::EUInt;
-		case EbtBool:       return EDataType::EBool;
-		default:   return EDataType::EUnknown;
+		case EbtFloat:      return NGFXShaderDataType::NGFX_SHADER_VAR_FLOAT;
+		case EbtInt:        return NGFXShaderDataType::NGFX_SHADER_VAR_INT;
+		case EbtUint:       return NGFXShaderDataType::NGFX_SHADER_VAR_UINT;
+		case EbtBool:       return NGFXShaderDataType::NGFX_SHADER_VAR_BOOL;
+		default:   return NGFXShaderDataType::NGFX_SHADER_VAR_UNKNOWN;
 		}
 	}
-	return EDataType::EUnknown;
+	return NGFXShaderDataType::NGFX_SHADER_VAR_UNKNOWN;
 }
 
-k3d::shc::EBindType glslangTypeToRHIType(const TBasicType & type)
+NGFXShaderBindType glslangTypeToRHIType(const TBasicType& type)
 {
-	using namespace k3d::shc;
 	switch (type) 
 	{
 	case EbtSampler:
-		return EBindType::ESampler;
+		return NGFXShaderBindType::NGFX_SHADER_BIND_SAMPLER;
 	case EbtStruct:
 	case EbtBlock:
-		return EBindType::EBlock;
+		return NGFXShaderBindType::NGFX_SHADER_BIND_BLOCK;
 	case EbtVoid:
-		return EBindType::EUndefined;
+		return NGFXShaderBindType::NGFX_SHADER_BIND_UNDEFINED;
 	default:
 		break;
 	}
-	return EBindType::EBlock;
+	return NGFXShaderBindType::NGFX_SHADER_BIND_BLOCK;
 }
 
 void initResources(TBuiltInResource &resources)
@@ -290,129 +287,129 @@ void initResources(TBuiltInResource &resources)
 	resources.limits.generalConstantMatrixVectorIndexing = 1;
 }
 
-EShLanguage findLanguage(const k3d::EShaderType shader_type)
+EShLanguage findLanguage(const NGFXShaderType shader_type)
 {
-	switch (shader_type) {
-	case k3d::ES_Vertex:
-		return EShLangVertex;
+  switch (shader_type)
+  {
+  case NGFX_SHADER_TYPE_VERTEX:
+    return EShLangVertex;
 
-	case k3d::ES_Hull:
-		return EShLangTessControl;
+  case NGFX_SHADER_TYPE_HULL:
+    return EShLangTessControl;
 
-	case k3d::ES_Domain:
-		return EShLangTessEvaluation;
+  case NGFX_SHADER_TYPE_DOMAIN:
+    return EShLangTessEvaluation;
 
-	case k3d::ES_Geometry:
-		return EShLangGeometry;
+  case NGFX_SHADER_TYPE_GEOMETRY:
+    return EShLangGeometry;
 
-	case k3d::ES_Fragment:
-		return EShLangFragment;
+  case NGFX_SHADER_TYPE_FRAGMENT:
+    return EShLangFragment;
 
-	case k3d::ES_Compute:
-		return EShLangCompute;
+  case NGFX_SHADER_TYPE_COMPUTE:
+    return EShLangCompute;
 
-	default:
-		return EShLangVertex;
-	}
+  default:
+    return EShLangVertex;
+  }
 }
 
-void ExtractAttributeData(const glslang::TProgram& program, k3d::shc::Attributes& shAttributes)
+void ExtractAttributeData(const TProgram& program, NGFXShaderAttributes& shAttributes)
 {
-	auto numAttrs = program.getNumLiveAttributes();
-	if (numAttrs > 0)
-	{
-		for (uint32 i = 0; i<numAttrs; i++)
-		{
-			auto name = program.getAttributeName(i);
-			auto type = program.getAttributeType(i);
-			shAttributes.Append({ name, k3d::shc::ESemantic::ENumSemanics, glTypeToRHIAttribType(type), i, 0, 0 });
-		}
-	}
+  auto numAttrs = program.getNumLiveAttributes();
+  if (numAttrs > 0)
+  {
+    for (uint32 i = 0; i < numAttrs; i++)
+    {
+      auto name = program.getAttributeName(i);
+      auto type = program.getAttributeType(i);
+      shAttributes.Append({name, NGFX_SEMANTIC_POSITION, glTypeToRHIAttribType(type), i, 0, 0});
+    }
+  }
 }
 
-void ExtractUniformData(k3d::EShaderType const& stype, const glslang::TProgram& program, k3d::shc::BindingTable& outUniformLayout)
+void ExtractUniformData(NGFXShaderType const& stype, const TProgram& program, NGFXShaderBindingTable& outUniformLayout)
 {
-	using namespace k3d::shc;
-	auto numUniforms = program.getNumLiveUniformVariables();
-	for (int i = 0; i < numUniforms; i++)
-	{
-		auto name = program.getUniformName(i);
-		auto index = program.getUniformIndex(name);
-		auto type = program.getUniformTType(index);
+  auto numUniforms = program.getNumLiveUniformVariables();
+  for (int i = 0; i < numUniforms; i++)
+  {
+    auto name = program.getUniformName(i);
+    auto index = program.getUniformIndex(name);
+    auto type = program.getUniformTType(index);
     bool isImage = type->isImage();
-		auto baseType = type->getBasicType();
-		auto qualifier = type->getQualifier();
-		if (qualifier.hasBinding())
-		{
-			k3d::shc::EBindType bind = glslangTypeToRHIType(baseType);
-			if (baseType == EbtSampler)
-			{
-				if (type->getSampler().isCombined())
-				{
-					bind = k3d::shc::EBindType::ESamplerImageCombine;
-				}
-				switch (type->getSampler().dim)
-				{
-				case Esd1D:
-				case Esd2D:
-				case Esd3D:
-				case EsdCube:
-				case EsdRect:
-					bind = k3d::shc::EBindType::ESampledImage;
-					break;
-				}
+    auto baseType = type->getBasicType();
+    auto qualifier = type->getQualifier();
+    if (qualifier.hasBinding())
+    {
+      NGFXShaderBindType bind = glslangTypeToRHIType(baseType);
+      if (baseType == EbtSampler)
+      {
+        if (type->getSampler().isCombined())
+        {
+          bind = NGFXShaderBindType::NGFX_SHADER_BIND_SAMPLER_IMAGE_COMBINE;
+        }
+        switch (type->getSampler().dim)
+        {
+        case Esd1D:
+        case Esd2D:
+        case Esd3D:
+        case EsdCube:
+        case EsdRect:
+          bind = NGFXShaderBindType::NGFX_SHADER_BIND_SAMPLED_IMAGE;
+          break;
+        }
         if (type->isImage())
         {
           switch (qualifier.storage)
           {
           case EvqUniform:
-            bind = k3d::shc::EBindType::ERWTexelBuffer;
+            bind = NGFXShaderBindType::NGFX_SHADER_BIND_RWTEXEL_BUFFER;
             break;
           case EvqBuffer:
-            bind = k3d::shc::EBindType::ERWTexelBuffer;
+            bind = NGFXShaderBindType::NGFX_SHADER_BIND_RWTEXEL_BUFFER;
             break;
           }
         }
-			}
-			outUniformLayout.AddBinding({ bind, name, stype, qualifier.layoutBinding });
-		}
-		if (qualifier.hasSet())
-		{
-			outUniformLayout.AddSet(qualifier.layoutSet);
-		}
-		if (baseType == EbtSampler)
-		{
-			auto sampler = type->getSampler();
-			if (!sampler.combined)
-			{
-				outUniformLayout.AddUniform({ glslangDataTypeToRHIDataType(*type), name, qualifier.hasOffset() ? (uint32)qualifier.layoutOffset : 0, /*type->getArraySizes()*/ });
-			}
-		}
-		else
-		{
-			outUniformLayout.AddUniform({ glslangDataTypeToRHIDataType(*type), name, qualifier.hasOffset() ? (uint32)qualifier.layoutOffset : 0, /*type->getArraySizes()*/ });
-		}
-	}
-	auto numUniformBlocks = program.getNumLiveUniformBlocks();
-	for (int i = 0; i < numUniformBlocks; i++)
-	{
-		auto block = program.getUniformBlockTType(i);
-		auto name = program.getUniformBlockName(i);
-		auto bindNum = program.getUniformBlockIndex(i);
-		auto bType = block->getBasicType();
-		auto qualifier = block->getQualifier();
-		if (qualifier.hasSet())
-		{
-			outUniformLayout.AddSet(qualifier.layoutSet);
-		}
-		if (qualifier.hasBinding())
-		{
-			outUniformLayout.AddBinding({ glslangTypeToRHIType(bType), name, stype, (uint32)qualifier.layoutBinding });
-		}
-		switch (bType)
-		{
-		case EbtString:
-			break;
-		}
-	}
+      }
+      outUniformLayout.AddBinding({bind, name, stype, qualifier.layoutBinding});
+    }
+    if (qualifier.hasSet())
+    {
+      outUniformLayout.AddSet(qualifier.layoutSet);
+    }
+    if (baseType == EbtSampler)
+    {
+      auto sampler = type->getSampler();
+      if (!sampler.combined)
+      {
+        outUniformLayout.AddUniform({glslangDataTypeToRHIDataType(*type), name, qualifier.hasOffset() ? (uint32)qualifier.layoutOffset : 0, /*type->getArraySizes()*/});
+      }
+    }
+    else
+    {
+      outUniformLayout.AddUniform({glslangDataTypeToRHIDataType(*type), name, qualifier.hasOffset() ? (uint32)qualifier.layoutOffset : 0, /*type->getArraySizes()*/});
+    }
+  }
+  auto numUniformBlocks = program.getNumLiveUniformBlocks();
+  for (int i = 0; i < numUniformBlocks; i++)
+  {
+    auto block = program.getUniformBlockTType(i);
+    auto name = program.getUniformBlockName(i);
+    auto bindNum = program.getUniformBlockIndex(i);
+    auto bType = block->getBasicType();
+    auto qualifier = block->getQualifier();
+    if (qualifier.hasSet())
+    {
+      outUniformLayout.AddSet(qualifier.layoutSet);
+    }
+    if (qualifier.hasBinding())
+    {
+      outUniformLayout.AddBinding({glslangTypeToRHIType(bType), name, stype, (uint32)qualifier.layoutBinding});
+    }
+    switch (bType)
+    {
+    case EbtString:
+      break;
+    }
+  }
 }

@@ -72,3 +72,7 @@ xcshareddata
 /Project/android/local.properties
 /Project/android/gradle.properties
 /Project/android/Triangle/src/main/assets/*
+/Tools/RHIGenerator/generator/*.pyc
+/Tools/RHIGenerator/generator/__pycache__
+/Tools/RHIGenerator/generator/*.pyc
+/.vs

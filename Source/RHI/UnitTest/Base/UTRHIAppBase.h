@@ -63,17 +63,17 @@ public:
   }
 
   void Compile(const char* shaderPath,
-               k3d::EShaderType const& type,
-               k3d::ShaderBundle& shader);
+               NGFXShaderType const& type,
+               NGFXShaderBundle& shader);
 
 
   template <typename ElementT>
-  GpuResourceRef AllocateConstBuffer(std::function<void(ElementT*ptr)> InitFunction, uint64 Count)
+  NGFXResourceRef AllocateConstBuffer(std::function<void(ElementT*ptr)> InitFunction, uint64 Count)
   {
     ResourceDesc desc;
-    desc.Type = EGT_Buffer;
-    desc.Flag = EGRAF_HostVisible | EGRAF_HostCoherent;
-    desc.ViewType = EGVT_CBV;
+    desc.Type = NGFX_BUFFER;
+    desc.Flag = NGFX_ACCESS_HOST_VISIBLE | NGFX_ACCESS_HOST_COHERENT;
+    desc.ViewFlags = NGFX_RESOURCE_CONSTANT_BUFFER_VIEW;
     desc.Size = Count * sizeof(ElementT);
     auto pResource = m_pDevice->CreateResource(desc);
     ElementT* ptr = (ElementT*)pResource->Map(0, sizeof(ElementT) * Count);
@@ -84,12 +84,12 @@ public:
 
 
   template <typename ElementT>
-  GpuResourceRef AllocateConstBuffer(ElementT Value)
+  NGFXResourceRef AllocateConstBuffer(ElementT Value)
   {
     ResourceDesc desc;
-    desc.Type = EGT_Buffer;
-    desc.Flag = EGRAF_HostVisible | EGRAF_HostCoherent;
-    desc.ViewType = EGVT_CBV;
+    desc.Type = NGFX_BUFFER;
+    desc.Flag = NGFX_ACCESS_HOST_VISIBLE | NGFX_ACCESS_HOST_COHERENT;
+    desc.ViewFlags = NGFX_RESOURCE_CONSTANT_BUFFER_VIEW;
     desc.Size = sizeof(ElementT);
     auto pResource = m_pDevice->CreateResource(desc);
     ElementT* ptr = (ElementT*)pResource->Map(0, sizeof(ElementT));
@@ -100,7 +100,7 @@ public:
 
   using Thread = std::thread;
   typedef SharedPtr<Thread> ThreadPtr;
-  typedef std::pair<ThreadPtr, GpuResourceRef> AsyncResourceRef;
+  typedef std::pair<ThreadPtr, NGFXResourceRef> AsyncResourceRef;
   /**
    * Async Load Buffers
    */
@@ -108,25 +108,25 @@ public:
   AsyncResourceRef AllocateVertexBuffer(std::function<void(VertexElementT *ptr)> InitFunction, uint64 Count)
   {
     ResourceDesc Desc;
-    Desc.Type = EGT_Buffer;
-    Desc.ViewType = EGVT_VBV;
-    Desc.Flag = EGRAF_DeviceVisible;
-    Desc.CreationFlag = EGRCF_TransferDst;
+    Desc.Type = NGFX_BUFFER;
+    Desc.ViewFlags = NGFX_RESOURCE_VERTEX_BUFFER_VIEW;
+    Desc.Flag = NGFX_ACCESS_DEVICE_VISIBLE;
+    Desc.CreationFlag = NGFX_RESOURCE_TRANSFER_DST;
     Desc.Size = Count * sizeof(VertexElementT);
     auto pDevice = m_pDevice;
     auto pQueue = m_pQueue;
     auto DeviceBuffer = m_pDevice->CreateResource(Desc);
     auto UploadThread = MakeShared<Thread>([=]() {
       ResourceDesc HostDesc;
-      HostDesc.ViewType = EGVT_Undefined;
-      HostDesc.Flag = EGRAF_HostVisible;
+      HostDesc.ViewFlags = NGFX_RESOURCE_VIEW_UNDEFINED;
+      HostDesc.Flag = NGFX_ACCESS_HOST_VISIBLE;
       HostDesc.Size = Count * sizeof(VertexElementT);
-      HostDesc.CreationFlag = EGRCF_TransferSrc;
+      HostDesc.CreationFlag = NGFX_RESOURCE_TRANSFER_SRC;
       auto HostBuffer = pDevice->CreateResource(HostDesc);
       VertexElementT* Ptr = (VertexElementT*)HostBuffer->Map(0, Count * sizeof(VertexElementT));
       InitFunction(Ptr);
       HostBuffer->UnMap();
-      auto copyCmd = pQueue->ObtainCommandBuffer(ECMDUsage_OneShot);
+      auto copyCmd = pQueue->ObtainCommandBuffer(NGFX_COMMAND_USAGE_ONE_SHOT);
       copyCmd->CopyBuffer(DeviceBuffer, HostBuffer, CopyBufferRegion{ 0, 0, HostDesc.Size });
       copyCmd->Commit();
     }/*, "VertexUploadThread"*/);
@@ -139,12 +139,12 @@ protected:
   k3d::IShCompiler::Ptr m_RHICompiler;
   SharedPtr<IModule> m_RHIModule;
 
-  k3d::FactoryRef m_pFactory;
-  k3d::DeviceRef m_pDevice;
-  k3d::CommandQueueRef m_pQueue;
-  k3d::SwapChainRef m_pSwapChain;
+  k3d::NGFXFactoryRef m_pFactory;
+  k3d::NGFXDeviceRef m_pDevice;
+  k3d::NGFXCommandQueueRef m_pQueue;
+  k3d::NGFXSwapChainRef m_pSwapChain;
   
-  k3d::SyncFenceRef m_pFence;
+  k3d::NGFXFenceRef m_pFence;
 
   uint32 m_Width;
   uint32 m_Height;
@@ -156,11 +156,11 @@ private:
   void InitializeRHIObjects();
 
 private:
-  k3d::SwapChainDesc m_SwapChainDesc = { k3d::EPF_RGBA8Unorm_sRGB,
+  k3d::SwapChainDesc m_SwapChainDesc = { NGFX_PIXEL_FORMAT_RGBA8_UNORM_SRGB,
                                          m_Width,
                                          m_Height,
                                          2 };
-  DynArray<k3d::DeviceRef> m_Devices;
+  DynArray<k3d::NGFXDeviceRef> m_Devices;
   bool m_EnableValidation;
 };
 
@@ -171,9 +171,9 @@ RHIAppBase::LoadGlslangCompiler()
     k3d::StaticPointerCast<k3d::IShModule>(ACQUIRE_PLUGIN(ShaderCompiler));
   if (m_ShaderModule) {
 #if K3DPLATFORM_OS_MAC
-    m_RHICompiler = m_ShaderModule->CreateShaderCompiler(k3d::ERHI_Metal);
+    m_RHICompiler = m_ShaderModule->CreateShaderCompiler(NGFX_RHI_METAL);
 #else
-    m_RHICompiler = m_ShaderModule->CreateShaderCompiler(k3d::ERHI_Vulkan);
+    m_RHICompiler = m_ShaderModule->CreateShaderCompiler(NGFX_RHI_VULKAN);
 #endif
   }
 }
@@ -230,17 +230,17 @@ RHIAppBase::LoadRHI()
 inline void
 RHIAppBase::InitializeRHIObjects()
 {
-  m_pQueue = m_pDevice->CreateCommandQueue(k3d::ECMD_Graphics);
+  m_pQueue = m_pDevice->CreateCommandQueue(NGFX_COMMAND_GRAPHICS);
   m_pSwapChain = m_pFactory->CreateSwapchain(
     m_pQueue, HostWindow()->GetHandle(), m_SwapChainDesc);
   m_pFence = m_pDevice->CreateFence();
-  auto cmd = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
+  auto cmd = m_pQueue->ObtainCommandBuffer(NGFX_COMMAND_USAGE_ONE_SHOT);
 }
 
 void
 RHIAppBase::Compile(const char* shaderPath,
-                    k3d::EShaderType const& type,
-                    k3d::ShaderBundle& shader)
+                    NGFXShaderType const& type,
+                    NGFXShaderBundle& shader)
 {
   IAsset* shaderFile = AssetManager::Open(shaderPath);
   if (!shaderFile) {
@@ -253,8 +253,12 @@ RHIAppBase::Compile(const char* shaderPath,
   shaderFile->Read(buffer.data(), shaderFile->GetLength());
   buffer[len] = 0;
   String src(buffer.data());
-  k3d::ShaderDesc desc = {
-    k3d::EShFmt_Text, k3d::EShLang_HLSL, k3d::EShProfile_Modern, type, "main"
+  k3d::NGFXShaderDesc desc =
+  {
+    NGFX_SHADER_FORMAT_TEXT,
+    NGFX_SHADER_LANG_HLSL,
+    NGFX_SHADER_PROFILE_MODERN, 
+    type, "main"
   };
   m_RHICompiler->Compile(src, desc, shader);
 }

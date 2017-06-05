@@ -257,10 +257,10 @@ endif(ANDROID)
 macro(add_unittest EXAMPLE_NAME)
     if(ANDROID)
         add_android_app(${EXAMPLE_NAME}
-            SRCS ${ARGN} ${Kaleido3D_SOURCE_DIR}/Platform/Android/jni/RendererView.cpp ${Kaleido3D_SOURCE_DIR}/Platform/Android/jni/RendererView_JNI.cpp
+            SRCS ${ARGN} ${Kaleido3D_SOURCE_DIR}/Platform/Android/jni/RendererView.cpp ${Kaleido3D_SOURCE_DIR}/Source/Platform/Android/jni/RendererView_JNI.cpp
             LIBS ${UT_LINK_LIBS})
     elseif(WIN32)
-        add_executable(${EXAMPLE_NAME} ${ARGN} ${Kaleido3D_SOURCE_DIR}/Platform/Windows/win32icon.rc)
+        add_executable(${EXAMPLE_NAME} ${ARGN} ${Kaleido3D_SOURCE_DIR}/Source/Platform/Windows/win32icon.rc)
         target_link_libraries(${EXAMPLE_NAME} ${UT_LINK_LIBS})
     elseif(MACOS)
         add_mac_app(${EXAMPLE_NAME} 
@@ -269,7 +269,7 @@ macro(add_unittest EXAMPLE_NAME)
             PLUGINS RHI_Metal KawaLog ShaderCompiler)
     elseif(IOS)
         add_ios_app(${EXAMPLE_NAME}
-            SRCS ${ARGN} "${Kaleido3D_SOURCE_DIR}/Platform/Apple/iOS/App.mm"
+            SRCS ${ARGN} "${Kaleido3D_SOURCE_DIR}/Source/Platform/Apple/iOS/App.mm"
             LIBS ${UT_LINK_LIBS}
             PDN ${EXAMPLE_NAME}
             OS 8.0

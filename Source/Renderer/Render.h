@@ -45,7 +45,7 @@ namespace render
 		ERTDirect3D12,
 	};
 
-	using PtrRHIDevice = std::shared_ptr<k3d::IDevice>;
+	using PtrRHIDevice = std::shared_ptr<k3d::NGFXDevice>;
 
 	/**
 	* Associated with RHI
@@ -71,11 +71,11 @@ namespace render
 
 		~RenderContext();
 
-		k3d::DeviceRef GetDevice() { return m_pDevice; }
+		k3d::NGFXDeviceRef GetDevice() { return m_pDevice; }
 		
 	protected:
 		RHIType					m_RhiType;
-		k3d::DeviceRef			m_pDevice;
+		k3d::NGFXDeviceRef			m_pDevice;
 		uint32 					m_Width = 0;
 		uint32 					m_Height = 0;
 	};

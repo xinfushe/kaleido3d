@@ -16,13 +16,20 @@ set(RHI_HEADERS
 	Public/IVkRHI.h
 )
 
+set(NGFX_HEADERS
+	../../../Include/Interface/IRHI.h
+	../../../Include/Interface/NGFX.h
+	../../../Include/Interface/NGFXObjectBase.h
+	../../../Include/Interface/NGFXEnums.h
+	../../../Include/Interface/NGFXStructs.h
+)
+
 set(RHI_IMPL_SRCS
 	Private/VkConfig.h
 	Private/VkRHI.h
 	Private/DynVulkanLoader.h
 	Private/VkEnums.h
-	Private/VkResource.cpp
-	Private/VkImpl.cpp
+	Private/VkRHI.cpp
 	Private/DynVulkanLoader.cpp
 )
 
@@ -46,13 +53,18 @@ source_group(
 	${RHI_Vulkan_RC}
 )
 
+source_group(
+	ngfx FILES
+	${NGFX_HEADERS}
+)
+
 add_plugin(RHI_Vulkan 
 	FOLDER "Runtime/RHI" 
-	SRCS ${VKRHI_SRC_LIST} ${RHI_HEADERS} ${RHI_IMPL_SRCS} 
+	SRCS ${VKRHI_SRC_LIST} ${RHI_HEADERS} ${RHI_IMPL_SRCS} ${NGFX_HEADERS} 
 	LIBS RHIUtil ShaderCompiler ${VULKAN_LIB})
 
 if(NOT ANDROID)
-	add_precompiled_header(RHI_Vulkan "VkCommon.h" "${Kaleido3D_ROOT_DIR}/Source/RHI/Vulkan" "${Kaleido3D_ROOT_DIR}/Source/RHI/Vulkan/Private/VkImpl.cpp")
+	add_precompiled_header(RHI_Vulkan "VkCommon.h" "${Kaleido3D_ROOT_DIR}/Source/RHI/Vulkan" "${Kaleido3D_ROOT_DIR}/Source/RHI/Vulkan/Private/VkRHI.cpp")
 endif()
 
 install(TARGETS RHI_Vulkan 

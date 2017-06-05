@@ -5,9 +5,9 @@ if(POLICY CMP0054)
   cmake_policy(SET CMP0054 OLD)
 endif()
 
-set(Kaleido3D_ROOT_DIR "${Kaleido3D_SOURCE_DIR}/..")
-set(K3D_THIRD_PARTY "${Kaleido3D_SOURCE_DIR}/ThirdParty_Prebuilt")
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${Kaleido3D_SOURCE_DIR}/../Project")
+set(Kaleido3D_ROOT_DIR "${Kaleido3D_SOURCE_DIR}")
+set(K3D_THIRD_PARTY "${Kaleido3D_SOURCE_DIR}/Source/ThirdParty_Prebuilt")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${Kaleido3D_SOURCE_DIR}/Project")
 set(CMAKE_FIND_ROOT_PATH "${K3D_THIRD_PARTY};${CMAKE_FIND_ROOT_PATH}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${Kaleido3D_ROOT_DIR}/Binary/")
 
@@ -103,8 +103,8 @@ if(ANDROID)
 endif()
 
 include_directories(
-	.
-	../Include
+	Source
+	Include
 )
 
 if(ANDROID)
@@ -126,27 +126,27 @@ if(MACOS)
 	find_package(Maya)
 endif()
 
-add_subdirectory(Core)
-add_subdirectory(Log)
-add_subdirectory(Renderer)
-add_subdirectory(Engine)
-add_subdirectory(RHI)
+add_subdirectory(Source/Core)
+add_subdirectory(Source/Log)
+add_subdirectory(Source/Renderer)
+add_subdirectory(Source/Engine)
+add_subdirectory(Source/RHI)
 
 if(BUILD_WITH_V8)
 	if(NOT (ANDROID OR MACOS))
-		add_subdirectory(Script)
+		add_subdirectory(Source/Script)
 	endif()
 endif()
 
 if(MAYA_FOUND)
-	add_subdirectory(Tools/MayaDCC)
+	add_subdirectory(Source/Tools/MayaDCC)
 endif()
 
-add_subdirectory(Tools/ShaderGen)
+add_subdirectory(Source/Tools/ShaderGen)
 
 if(LibClang_FOUND)
 message(STATUS "libclang found, cpp_reflector will be built!")
-add_subdirectory(Tools/CppReflector)
+add_subdirectory(Source/Tools/CppReflector)
 endif(LibClang_FOUND)
 
 if(BUILD_WITH_EDITOR)
@@ -155,5 +155,5 @@ if(BUILD_WITH_EDITOR)
 	set(CMAKE_INCLUDE_CURRENT_DIR ON)
 	set(Qt5_DIR "C:/bin/Qt/Qt5.8.0/msvc2017_dynamic/lib/cmake/Qt5")
 	find_package(Qt5 COMPONENTS Core Widgets REQUIRED)
-	add_subdirectory(Tools/Editor)
+	add_subdirectory(Source/Tools/Editor)
 endif()

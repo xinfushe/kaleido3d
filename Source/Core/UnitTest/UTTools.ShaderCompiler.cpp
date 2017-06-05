@@ -20,13 +20,13 @@ void TestShaderCompiler()
 	if (shMod)
 	{
 		// test compile
-		SharedPtr<k3d::IShCompiler> vkCompiler = shMod->CreateShaderCompiler(k3d::ERHI_Vulkan);
+		SharedPtr<k3d::IShCompiler> vkCompiler = shMod->CreateShaderCompiler(NGFX_RHI_VULKAN);
 		if (vkCompiler)
 		{
-			k3d::ShaderDesc desc = { k3d::EShFmt_Text, k3d::EShLang_GLSL, k3d::EShProfile_Modern, k3d::ES_Vertex, "main" };
-			k3d::ShaderBundle bundle;
+			k3d::NGFXShaderDesc desc = { NGFX_SHADER_FORMAT_TEXT, NGFX_SHADER_LANG_GLSL, NGFX_SHADER_PROFILE_MODERN, NGFX_SHADER_TYPE_VERTEX, "main" };
+			k3d::NGFXShaderBundle bundle;
 			auto ret = vkCompiler->Compile(vertexSource, desc, bundle);
-			K3D_ASSERT(ret == k3d::shc::E_Ok);
+			K3D_ASSERT(ret == NGFX_SHADER_COMPILE_OK);
 
 			// test shader serialize
 			Os::File shBundle;
@@ -44,7 +44,7 @@ void TestShaderCompiler()
 
 			// test shader deserialize;
 			Os::File shBundleRead;
-			k3d::ShaderBundle bundleRead;
+			k3d::NGFXShaderBundle bundleRead;
 			shBundleRead.Open(KT("shaderbundle.sh"), IORead);
 			Archive readar;
 			readar.SetIODevice(&shBundleRead);
@@ -52,29 +52,29 @@ void TestShaderCompiler()
 			shBundleRead.Close();
 
 			// test hlsl compile
-			k3d::ShaderBundle hlslBundle;
+			k3d::NGFXShaderBundle hlslBundle;
 			Os::MemMapFile hlslVertFile;
 			hlslVertFile.Open("../../Data/Test/TestMaterial.hlsl", IOFlag::IORead);
-			k3d::ShaderDesc hlsldesc = { k3d::EShFmt_Text, k3d::EShLang_HLSL, k3d::EShProfile_Modern, k3d::ES_Vertex, "main" };
+			k3d::NGFXShaderDesc hlsldesc = { NGFX_SHADER_FORMAT_TEXT, NGFX_SHADER_LANG_HLSL, NGFX_SHADER_PROFILE_MODERN, NGFX_SHADER_TYPE_VERTEX, "main" };
 			auto hlslret = vkCompiler->Compile(String((const char*)hlslVertFile.FileData()), hlsldesc, hlslBundle);
-			K3D_ASSERT(hlslret == k3d::shc::E_Ok);
+			K3D_ASSERT(hlslret == NGFX_SHADER_COMPILE_OK);
 
 			// test spirv reflect
 			Os::MemMapFile spirvFileRead;
-			k3d::ShaderBundle spirvBundle;
+			k3d::NGFXShaderBundle spirvBundle;
 			spirvFileRead.Open(KT("triangle.spv"), IORead);
-			k3d::ShaderDesc spirvDesc = { k3d::EShFmt_ByteCode, k3d::EShLang_GLSL, k3d::EShProfile_Modern, k3d::ES_Vertex, "main" };
+			k3d::NGFXShaderDesc spirvDesc = { NGFX_SHADER_FORMAT_BYTE_CODE, NGFX_SHADER_LANG_GLSL, NGFX_SHADER_PROFILE_MODERN, NGFX_SHADER_TYPE_VERTEX, "main" };
 			auto spirvRet = vkCompiler->Compile(String(spirvFileRead.FileData(), spirvFileRead.GetSize()), spirvDesc, spirvBundle);
-			K3D_ASSERT(spirvRet == k3d::shc::E_Ok);
+			K3D_ASSERT(spirvRet == NGFX_SHADER_COMPILE_OK);
 		}
             
-        SharedPtr<k3d::IShCompiler> mtlCompiler = shMod->CreateShaderCompiler(k3d::ERHI_Metal);
+        SharedPtr<k3d::IShCompiler> mtlCompiler = shMod->CreateShaderCompiler(NGFX_RHI_METAL);
         if(mtlCompiler)
         {
-            k3d::ShaderDesc desc = { k3d::EShFmt_Text, k3d::EShLang_GLSL, k3d::EShProfile_Modern, k3d::ES_Vertex, "main" };
-            k3d::ShaderBundle bundle;
+            k3d::NGFXShaderDesc desc = { NGFX_SHADER_FORMAT_TEXT, NGFX_SHADER_LANG_GLSL, NGFX_SHADER_PROFILE_MODERN, NGFX_SHADER_TYPE_VERTEX, "main" };
+            k3d::NGFXShaderBundle bundle;
             auto ret = mtlCompiler->Compile(vertexSource, desc, bundle);
-            K3D_ASSERT(ret == k3d::shc::E_Ok);
+            K3D_ASSERT(ret == NGFX_SHADER_COMPILE_OK);
                 
             // test shader serialize
             Os::File shBundle;

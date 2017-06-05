@@ -1,7 +1,6 @@
 #pragma once
 
 #include "IModule.h"
-#include "RHIEnums.h"
 #include "ShaderCommon.h"
 
 K3D_COMMON_NS
@@ -12,9 +11,9 @@ K3D_COMMON_NS
   struct IShCompiler
   {
     typedef ::k3d::SharedPtr<IShCompiler> Ptr;
-    virtual shc::EResult Compile(String const& src,
-                                 ShaderDesc const& inOp,
-                                 ShaderBundle& bundle) = 0;
+    virtual NGFXShaderCompileResult Compile(String const& src,
+                                 NGFXShaderDesc const& inOp,
+                                 NGFXShaderBundle& bundle) = 0;
     virtual ~IShCompiler() {}
   };
 
@@ -22,7 +21,7 @@ K3D_COMMON_NS
   {
   public:
     virtual ~IShModule() {}
-    virtual IShCompiler::Ptr CreateShaderCompiler(ERHIType const&) = 0;
+    virtual IShCompiler::Ptr CreateShaderCompiler(NGFXRHIType const&) = 0;
     // virtual ::k3d::DynArray<String> ListAvailableShaderLanguage() const = 0;
   };
 }

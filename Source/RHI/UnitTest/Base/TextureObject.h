@@ -11,18 +11,18 @@
 class TextureObject
 {
 public:
-	TextureObject(k3d::DeviceRef pDevice, const uint8_t* dataInMemory, bool useStaging = true);
+	TextureObject(k3d::NGFXDeviceRef pDevice, const uint8_t* dataInMemory, bool useStaging = true);
 	~TextureObject();
 
 	uint64 GetSize() const { return m_DataSize; }
 
-	void MapIntoBuffer(k3d::GpuResourceRef stageBuff);
+	void MapIntoBuffer(k3d::NGFXResourceRef stageBuff);
 
-	void CopyAndInitTexture(k3d::GpuResourceRef stageBuff);
+	void CopyAndInitTexture(k3d::NGFXResourceRef stageBuff);
 
-	k3d::GpuResourceRef GetResource() const { return m_Resource; }
+	k3d::NGFXResourceRef GetResource() const { return m_Resource; }
 
-	k3d::SamplerRef GetSampler()
+	k3d::NGFXSamplerRef GetSampler()
 	{
 		return m_sampler;
 	}
@@ -34,10 +34,10 @@ protected:
 	bool Destroy();
 
 private:
-	k3d::DeviceRef m_pDevice;
-	k3d::GpuResourceRef m_Resource;
-	k3d::SamplerRef m_sampler;
-	k3d::EPixelFormat m_format;
+	k3d::NGFXDeviceRef m_pDevice;
+	k3d::NGFXResourceRef m_Resource;
+	k3d::NGFXSamplerRef m_sampler;
+	NGFXPixelFormat m_format;
 	bool	m_UseStaging;
 	uint64	m_DataSize;
 	uint32_t m_width;

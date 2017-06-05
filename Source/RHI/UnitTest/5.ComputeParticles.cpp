@@ -63,23 +63,23 @@ private:
   float m_AttractorMasses[MAX_ATTRACTORS];
 
 private:
-  k3d::PipelineStateRef m_pGfxPso;
-  k3d::PipelineLayoutRef m_pGfxPl;
-  k3d::BindingGroupRef m_GfxBindingGroup;
+  k3d::NGFXPipelineStateRef m_pGfxPso;
+  k3d::NGFXPipelineLayoutRef m_pGfxPl;
+  k3d::NGFXBindingGroupRef m_GfxBindingGroup;
 
-  k3d::PipelineStateRef m_pCompPso;
-  k3d::PipelineLayoutRef m_pCompPl;
-  k3d::BindingGroupRef m_CptBindingGroup;
+  k3d::NGFXPipelineStateRef m_pCompPso;
+  k3d::NGFXPipelineLayoutRef m_pCompPl;
+  k3d::NGFXBindingGroupRef m_CptBindingGroup;
 
-  k3d::BufferRef m_PositionBuffer;
-  k3d::UnorderedAccessViewRef m_PosUAV;
-  k3d::BufferRef m_VelocityBuffer;
-  k3d::UnorderedAccessViewRef m_VelUAV;
+  k3d::NGFXBufferRef m_PositionBuffer;
+  k3d::NGFXUAVRef m_PosUAV;
+  k3d::NGFXBufferRef m_VelocityBuffer;
+  k3d::NGFXUAVRef m_VelUAV;
   k3d::VertexBufferView m_PosVBV;
 
-  k3d::BufferRef m_AttractorMassBuffer;
-  k3d::BufferRef m_DtBuffer;
-  k3d::GpuResourceRef m_MVPBuffer;
+  k3d::NGFXBufferRef m_AttractorMassBuffer;
+  k3d::NGFXBufferRef m_DtBuffer;
+  k3d::NGFXResourceRef m_MVPBuffer;
 
   uint64 CurrentTick;
 private:
@@ -128,7 +128,7 @@ UTComputeParticles::OnInit()
     }
     KLOG(Info, App, "Particle generate finished, %s", Os::Thread::GetCurrentThreadName().CStr());
   }, PARTICLE_COUNT);
-  m_PositionBuffer = StaticPointerCast<k3d::IBuffer>(PositionBuffer.second);
+  m_PositionBuffer = StaticPointerCast<k3d::NGFXBuffer>(PositionBuffer.second);
   m_PositionBuffer->SetName("Position");
 
   auto VelocityBuffer = AllocateVertexBuffer<Vec4f>([](Vec4f* Pointer)
@@ -154,11 +154,11 @@ UTComputeParticles::OnInit()
     }
     KLOG(Info, App, "velocity generate finished, %s", Os::Thread::GetCurrentThreadName().CStr());
   }, PARTICLE_COUNT);
-  m_VelocityBuffer = StaticPointerCast<k3d::IBuffer>(VelocityBuffer.second);
+  m_VelocityBuffer = StaticPointerCast<k3d::NGFXBuffer>(VelocityBuffer.second);
   m_VelocityBuffer->SetName("Velocity");
 
   // create uavs
-  UAVDesc uavDesc = { EViewDimension::EVD_Buffer, EPixelFormat::EPF_RGBA32Float };
+  UAVDesc uavDesc = { NGFXViewDimension::NGFX_VIEW_DIMENSION_BUFFER, NGFXPixelFormat::NGFX_PIXEL_FORMAT_RGBA32_FLOAT };
   uavDesc.Buffer = { 0, PARTICLE_COUNT, sizeof(Vec4f) };
   m_PosUAV = m_pDevice->CreateUnorderedAccessView(m_PositionBuffer, uavDesc);
   m_VelUAV = m_pDevice->CreateUnorderedAccessView(m_VelocityBuffer, uavDesc);
@@ -171,32 +171,32 @@ UTComputeParticles::OnInit()
       m_AttractorMasses[i] = 0.5f + random_float() * 0.5f;
     }
   }, MAX_ATTRACTORS);
-  m_AttractorMassBuffer = StaticPointerCast<k3d::IBuffer>(AttractorMassBuffer);
+  m_AttractorMassBuffer = StaticPointerCast<k3d::NGFXBuffer>(AttractorMassBuffer);
   m_AttractorMassBuffer->SetName("Attractor");
 
   auto dt = AllocateConstBuffer<float>(1.0f);
-  m_DtBuffer = StaticPointerCast<k3d::IBuffer>(dt);
+  m_DtBuffer = StaticPointerCast<k3d::NGFXBuffer>(dt);
   m_DtBuffer->SetName("Dt");
 
   // create input state
-  m_IAState.Attribs[0] = { k3d::EVF_Float4x32, 0, 0 };
-  m_IAState.Layouts[0] = { k3d::EVIR_PerVertex, sizeof(float) * 4 };
+  m_IAState.Attribs[0] = { NGFX_VERTEX_FORMAT_FLOAT4X32, 0, 0 };
+  m_IAState.Layouts[0] = { NGFX_VERTEX_INPUT_RATE_PER_VERTEX, sizeof(float) * 4 };
   m_PosVBV = { m_PositionBuffer->GetLocation(), 0, 0 };
 
   // create MVP
   k3d::ResourceDesc desc;
-  desc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
-  desc.ViewType = k3d::EGpuMemViewType::EGVT_CBV;
+  desc.Flag = NGFX_ACCESS_HOST_VISIBLE;
+  desc.ViewFlags = NGFX_RESOURCE_CONSTANT_BUFFER_VIEW;
   desc.Size = sizeof(MVPMatrix);
   m_MVPBuffer = m_pDevice->CreateResource(desc);
   m_MVPBuffer->SetName("MVPMatrix");
 
   // compile shaders
-  k3d::ShaderBundle vertSh, fragSh, compSh;
-  Compile("asset://Test/particles.vert", k3d::ES_Vertex, vertSh);
-  Compile("asset://Test/particles.frag", k3d::ES_Fragment, fragSh);
+  k3d::NGFXShaderBundle vertSh, fragSh, compSh;
+  Compile("asset://Test/particles.vert", NGFX_SHADER_TYPE_VERTEX, vertSh);
+  Compile("asset://Test/particles.frag", NGFX_SHADER_TYPE_FRAGMENT, fragSh);
 
-  Compile("asset://Test/particles.comp", k3d::ES_Compute, compSh);
+  Compile("asset://Test/particles.comp", NGFX_SHADER_TYPE_COMPUTE, compSh);
 
   auto vertBinding = vertSh.BindingTable;
   auto fragBinding = fragSh.BindingTable;
@@ -207,8 +207,8 @@ UTComputeParticles::OnInit()
 
   k3d::ColorAttachmentDesc ColorAttach;
   ColorAttach.pTexture = m_pSwapChain->GetCurrentTexture();
-  ColorAttach.LoadAction = k3d::ELA_Clear;
-  ColorAttach.StoreAction = k3d::ESA_Store;
+  ColorAttach.LoadAction = NGFX_LOAD_ACTION_CLEAR;
+  ColorAttach.StoreAction = NGFX_STORE_ACTION_STORE;
   ColorAttach.ClearColor = Vec4f(0, 0, 0, 1);
 
   m_RpDesc.ColorAttachments.Append(ColorAttach);
@@ -217,10 +217,10 @@ UTComputeParticles::OnInit()
   k3d::RenderPipelineStateDesc renderPipelineDesc;
   renderPipelineDesc.AttachmentsBlend.Append(AttachmentState());
   renderPipelineDesc.AttachmentsBlend[0].Blend.Enable = true;
-  renderPipelineDesc.AttachmentsBlend[0].Blend.Src = BlendState::EBlend::One;
-  renderPipelineDesc.AttachmentsBlend[0].Blend.Dest = BlendState::EBlend::One;
-  renderPipelineDesc.AttachmentsBlend[0].Blend.DestBlendAlpha = BlendState::EBlend::One;
-  renderPipelineDesc.PrimitiveTopology = EPT_Points;
+  renderPipelineDesc.AttachmentsBlend[0].Blend.Src = NGFX_BLEND_FACTOR_ONE;
+  renderPipelineDesc.AttachmentsBlend[0].Blend.Dest = NGFX_BLEND_FACTOR_ONE;
+  renderPipelineDesc.AttachmentsBlend[0].Blend.DestBlendAlpha = NGFX_BLEND_FACTOR_ONE;
+  renderPipelineDesc.PrimitiveTopology = NGFX_PRIMITIVE_POINTS;
   renderPipelineDesc.InputState = m_IAState;
   renderPipelineDesc.VertexShader = vertSh;
   renderPipelineDesc.PixelShader = fragSh;
@@ -228,8 +228,8 @@ UTComputeParticles::OnInit()
 
   m_pCompPl = m_pDevice->CreatePipelineLayout(compSh.BindingTable);
   m_CptBindingGroup = m_pCompPl->ObtainBindingGroup();
-  m_CptBindingGroup->Update(0, StaticPointerCast<k3d::IGpuResource>(m_AttractorMassBuffer));
-  m_CptBindingGroup->Update(1, StaticPointerCast<k3d::IGpuResource>(m_DtBuffer));
+  m_CptBindingGroup->Update(0, StaticPointerCast<k3d::NGFXResource>(m_AttractorMassBuffer));
+  m_CptBindingGroup->Update(1, StaticPointerCast<k3d::NGFXResource>(m_DtBuffer));
   m_CptBindingGroup->Update(2, m_VelUAV);
   m_CptBindingGroup->Update(3, m_PosUAV);
   k3d::ComputePipelineStateDesc computePipelineDesc;
@@ -251,7 +251,7 @@ UTComputeParticles::OnUpdate()
   auto ImageDesc = currentImage->GetDesc();
   m_RpDesc.ColorAttachments[0].pTexture = currentImage;
 
-  auto renderCmdBuffer = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
+  auto renderCmdBuffer = m_pQueue->ObtainCommandBuffer(NGFX_COMMAND_USAGE_ONE_SHOT);
   auto renderCmd = renderCmdBuffer->RenderCommandEncoder(m_RpDesc);
   renderCmd->SetBindingGroup(m_GfxBindingGroup);
   k3d::Rect rect{ 0, 0, ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height };
@@ -302,13 +302,13 @@ UTComputeParticles::OnUpdate()
   *pDt = delta_time;
   m_DtBuffer->UnMap();
 
-  auto computeCmdBuffer = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
+  auto computeCmdBuffer = m_pQueue->ObtainCommandBuffer(NGFX_COMMAND_USAGE_ONE_SHOT);
   auto computeCmd = computeCmdBuffer->ComputeCommandEncoder();
-  computeCmdBuffer->Transition(m_PositionBuffer, ERS_UnorderedAccess);
+  computeCmdBuffer->Transition(m_PositionBuffer, NGFX_RESOURCE_STATE_UNORDERED_ACCESS);
   computeCmd->SetPipelineState(0, m_pCompPso);
   computeCmd->SetBindingGroup(m_CptBindingGroup);
   computeCmd->Dispatch(PARTICLE_GROUP_COUNT, 1, 1);
-  computeCmdBuffer->Transition(m_PositionBuffer, ERS_VertexAndConstantBuffer);
+  computeCmdBuffer->Transition(m_PositionBuffer, NGFX_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
   computeCmd->EndEncode();
   computeCmdBuffer->Commit(m_pFence);
 

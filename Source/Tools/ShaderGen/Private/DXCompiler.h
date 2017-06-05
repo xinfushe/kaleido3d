@@ -19,10 +19,10 @@ namespace k3d
 		~DXCompiler() override {}
 
 		typedef ::k3d::SharedPtr<IShCompiler> Ptr;
-		virtual k3d::shc::EResult Compile(
+		virtual k3d::shc::NGFXShaderCompileResult Compile(
 			String const& src,
-			k3d::ShaderDesc const& inOp,
-			k3d::ShaderBundle & bundle) override;
+			k3d::NGFXShaderDesc const& inOp,
+			k3d::NGFXShaderBundle & bundle) override;
 		const char *				GetVersion();
 	};
 }

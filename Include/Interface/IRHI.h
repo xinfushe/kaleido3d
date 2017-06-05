@@ -2,8 +2,9 @@
 
 #include "../KTL/SharedPtr.hpp"
 #include "../Math/kGeometry.hpp"
-#include "RHIStructs.h"
+#include "NGFXStructs.h"
 #include "ICrossShaderCompiler.h"
+#include "NGFX.h"
 
 K3D_COMMON_NS
 {
@@ -12,71 +13,44 @@ struct IObject
   virtual void SetName(const char*) {}
   virtual void Release() = 0;
 };
-struct ICommandQueue;
-typedef ::k3d::SharedPtr<ICommandQueue> CommandQueueRef;
-struct ICommandBuffer;
-typedef ::k3d::SharedPtr<ICommandBuffer> CommandBufferRef;
-struct IRenderCommandEncoder;
-typedef ::k3d::SharedPtr<IRenderCommandEncoder> RenderCommandEncoderRef;
-struct IComputeCommandEncoder;
-typedef ::k3d::SharedPtr<IComputeCommandEncoder> ComputeCommandEncoderRef;
-struct IParallelRenderCommandEncoder;
-typedef ::k3d::SharedPtr<IParallelRenderCommandEncoder>
-  ParallelRenderCommandEncoderRef;
 
-struct IDevice;
-typedef ::k3d::SharedPtr<IDevice> DeviceRef;
-struct IFactory;
-typedef ::k3d::SharedPtr<IFactory> FactoryRef;
-struct IGpuResource;
-typedef ::k3d::SharedPtr<IGpuResource> GpuResourceRef;
-struct ITexture;
-typedef ::k3d::SharedPtr<ITexture> TextureRef;
-struct IBuffer;
-typedef ::k3d::SharedPtr<IBuffer> BufferRef;
-struct ITextureView;
-typedef ::k3d::SharedPtr<ITextureView> TextureViewRef;
-struct IBufferView;
-typedef ::k3d::SharedPtr<IBufferView> BufferViewRef;
+typedef SharedPtr<struct NGFXCommandQueue> NGFXCommandQueueRef;
+typedef SharedPtr<struct NGFXCommandBuffer> NGFXCommandBufferRef;
+typedef SharedPtr<struct NGFXRenderCommandEncoder> NGFXRenderCommandEncoderRef;
+typedef SharedPtr<struct NGFXComputeCommandEncoder> NGFXComputeCommandEncoderRef;
+typedef SharedPtr<struct NGFXParallelRenderCommandEncoder> NGFXParallelRenderCommandEncoderRef;
+typedef SharedPtr<struct NGFXDevice> NGFXDeviceRef;
+typedef SharedPtr<struct NGFXFactory> NGFXFactoryRef;
+typedef SharedPtr<struct NGFXResource> NGFXResourceRef;
+typedef SharedPtr<struct NGFXTexture> NGFXTextureRef;
+typedef SharedPtr<struct NGFXBuffer> NGFXBufferRef;
+typedef SharedPtr<struct NGFXTextureView> TextureViewRef;
+typedef SharedPtr<struct NGFXBufferView> BufferViewRef;
 
 // buffer: texel buffer ReadOnly 
 // texture: sampled ReadOnly
-struct IShaderResourceView;
-typedef ::k3d::SharedPtr<IShaderResourceView> ShaderResourceViewRef;
+typedef SharedPtr<struct NGFXShaderResourceView> NGFXSRVRef;
 
 // buffer: RWBuffer, RWStructedBuffer,
 // texture: RWTexture
-struct IUnorderedAccessView;
-typedef ::k3d::SharedPtr<IUnorderedAccessView> UnorderedAccessViewRef;
-
-struct IPipelineState;
-typedef ::k3d::SharedPtr<IPipelineState> PipelineStateRef;
-struct IRenderPipelineState;
-typedef ::k3d::SharedPtr<IRenderPipelineState> RenderPipelineStateRef;
-struct IComputePipelineState;
-typedef ::k3d::SharedPtr<IComputePipelineState> ComputePipelineStateRef;
-struct IRenderPipelineEncoder;
-typedef ::k3d::SharedPtr<IRenderPipelineEncoder> RenderPipelineEncoderRef;
-struct IComputePipelineEncoder;
-typedef ::k3d::SharedPtr<IComputePipelineEncoder> ComputePipelineEncoderRef;
-struct ISwapChain;
-typedef ::k3d::SharedPtr<ISwapChain> SwapChainRef;
-struct ISampler;
-typedef ::k3d::SharedPtr<ISampler> SamplerRef;
-typedef const SamplerRef SamplerCRef;
-struct IBindingGroup;
-typedef ::k3d::SharedPtr<IBindingGroup> BindingGroupRef;
-struct IRenderTarget;
-typedef ::k3d::SharedPtr<IRenderTarget> RenderTargetRef;
-struct IRenderPass;
-typedef ::k3d::SharedPtr<IRenderPass> RenderPassRef;
+typedef SharedPtr<struct NGFXUnorderedAccessView> NGFXUAVRef;
+typedef SharedPtr<struct NGFXPipelineState> NGFXPipelineStateRef;
+typedef SharedPtr<struct NGFXRenderPipelineState> RenderPipelineStateRef;
+typedef SharedPtr<struct NGFXComputePipelineState> ComputePipelineStateRef;
+typedef SharedPtr<struct NGFXRenderPipelineEncoder> RenderPipelineEncoderRef;
+typedef SharedPtr<struct NGFXComputePipelineEncoder> ComputePipelineEncoderRef;
+typedef SharedPtr<struct NGFXSwapChain> NGFXSwapChainRef;
+typedef SharedPtr<struct NGFXSampler> NGFXSamplerRef;
+typedef SharedPtr<struct NGFXBindingGroup> NGFXBindingGroupRef;
+typedef SharedPtr<struct NGFXRenderTarget> NGFXRenderTargetRef;
+typedef SharedPtr<struct NGFXRenderpass> NGFXRenderpassRef;
 /**
  * Semaphore used for GPU to GPU syncs,
  * Specifically used to sync queue submissions (on the same or different
  * queues), Set on GPU, Wait on GPU (inter-queue) Events: Set anywhere, Wait on
  * GPU (intra-queue)
  */
-struct ISemaphore;
+struct NGFXSemaphore;
 
 /**
  * @see
@@ -84,20 +58,18 @@ struct ISemaphore;
  * Fence is GPU to CPU syncs
  * Set on GPU, Wait on CPU
  */
-struct ISyncFence;
-typedef ::k3d::SharedPtr<ISyncFence> SyncFenceRef;
+typedef SharedPtr<struct NGFXFence> NGFXFenceRef;
 
 /**
- * Vulkan has pipeline layout,
- * D3D12 is root signature.
- * PipelineLayout defines shaders impose constraints on table layout.
- */
-struct IPipelineLayout;
-typedef ::k3d::SharedPtr<IPipelineLayout> PipelineLayoutRef;
+  * Vulkan has pipeline layout,
+  * D3D12 is root signature.
+  * PipelineLayout defines shaders impose constraints on table layout.
+  */
+typedef SharedPtr<struct NGFXPipelineLayout> NGFXPipelineLayoutRef;
 
-struct IGpuResource : public IObject
+struct NGFXResource : public IObject
 {
-  virtual ~IGpuResource() {}
+  virtual ~NGFXResource() {}
   virtual void* Map(uint64 start, uint64 size) = 0;
   virtual void UnMap() = 0;
 
@@ -105,59 +77,53 @@ struct IGpuResource : public IObject
   virtual ResourceDesc GetDesc() const = 0;
 
   /**
-   * Vulkan: texture uses image layout as resource state
-   * D3D12: used for transition, maybe used as ShaderVisiblity determination in
+   * Vulkan: texture uses image layout as resource state <br/>
+   * D3D12: used for transition, maybe used as ShaderVisiblity determination in <br/>
    * STATIC_SAMPLER and descriptor table
    */
-  virtual EResourceState GetState() const { return ERS_Unknown; }
+  virtual NGFXResourceState GetState() const { return NGFX_RESOURCE_STATE_UNKNOWN; }
   virtual uint64 GetSize() const = 0;
 };
 
-struct ISampler
+struct NGFXSampler
 {
   virtual SamplerState GetSamplerDesc() const = 0;
-  virtual ~ISampler() {}
+  virtual ~NGFXSampler() {}
 };
 
-struct IShaderResourceView
+struct NGFXShaderResourceView
 {
-  virtual ~IShaderResourceView() {}
-  virtual GpuResourceRef GetResource() const = 0;
+  virtual ~NGFXShaderResourceView() {}
+  virtual NGFXResourceRef GetResource() const = 0;
   virtual SRVDesc GetDesc() const = 0;
 };
 
-struct ITexture : public IGpuResource
+struct NGFXTexture : public NGFXResource
 {
-  virtual ~ITexture() {}
-  virtual SamplerCRef GetSampler() const = 0;
-  virtual void BindSampler(SamplerRef) = 0;
-  virtual void SetResourceView(ShaderResourceViewRef) = 0;
-  virtual ShaderResourceViewRef GetResourceView() const = 0;
+  virtual ~NGFXTexture() {}
+  virtual NGFXSamplerRef GetSampler() const = 0;
+  virtual void BindSampler(NGFXSamplerRef) = 0;
+  virtual void SetResourceView(NGFXSRVRef) = 0;
+  virtual NGFXSRVRef GetResourceView() const = 0;
 };
 
-struct IBuffer : public IGpuResource
+struct NGFXBuffer : public NGFXResource
 {
-  virtual ~IBuffer() {}
+  virtual ~NGFXBuffer() {}
 };
 
-struct IUnorderedAccessView
+struct NGFXUnorderedAccessView
 {
-  virtual ~IUnorderedAccessView() {}
+  virtual ~NGFXUnorderedAccessView() {}
 };
 
-struct IBindingGroup
+struct NGFXBindingGroup
 {
-  virtual void Update(uint32 bindSet, GpuResourceRef) = 0;
-  virtual void Update(uint32 bindSet, UnorderedAccessViewRef) = 0;
-  virtual void Update(uint32 bindSet, SamplerRef){};
+  virtual void Update(uint32 bindSet, NGFXResourceRef) = 0;
+  virtual void Update(uint32 bindSet, NGFXUAVRef) = 0;
+  virtual void Update(uint32 bindSet, NGFXSamplerRef){};
   virtual uint32 GetSlotNum() const { return 0; }
-  virtual ~IBindingGroup() {}
-};
-
-struct IDeviceAdapter
-{
-  virtual DeviceRef GetDevice() = 0;
-  virtual ~IDeviceAdapter() {}
+  virtual ~NGFXBindingGroup() {}
 };
 
 /**
@@ -165,10 +131,10 @@ struct IDeviceAdapter
  * D3D12 is root signature.
  * PipelineLayout defines shaders impose constraints on table layout.
  */
-struct IPipelineLayout
+struct NGFXPipelineLayout
 {
-  virtual BindingGroupRef ObtainBindingGroup() = 0;
-  virtual ~IPipelineLayout() {}
+  virtual NGFXBindingGroupRef ObtainBindingGroup() = 0;
+  virtual ~NGFXPipelineLayout() {}
 };
 
 /**
@@ -177,31 +143,31 @@ struct IPipelineLayout
  * Fence is GPU to CPU syncs
  * Set on GPU, Wait on CPU
  */
-struct ISyncFence
+struct NGFXFence
 {
   virtual void Signal(int32 fenceVal) = 0;
   virtual void Reset() {}
   virtual void WaitFor(uint64 time) = 0;
-  virtual ~ISyncFence() {}
+  virtual ~NGFXFence() {}
 };
 
-struct IRenderTarget
+struct NGFXRenderTarget
 {
-  virtual ~IRenderTarget() {}
+  virtual ~NGFXRenderTarget() {}
   virtual void SetClearColor(kMath::Vec4f clrColor) = 0;
   virtual void SetClearDepthStencil(float depth, uint32 stencil) = 0;
-  virtual GpuResourceRef GetBackBuffer() = 0;
+  virtual NGFXResourceRef GetBackBuffer() = 0;
 };
 
 struct ComputePipelineStateDesc
 {
-  ShaderBundle ComputeShader;
+  NGFXShaderBundle ComputeShader;
 };
 
-struct IPipelineState
+struct NGFXPipelineState
 {
-  virtual ~IPipelineState() {}
-  virtual EPipelineType GetType() const = 0;
+  virtual ~NGFXPipelineState() {}
+  virtual NGFXPipelineType GetType() const = 0;
 
   // rebuild pipeline state if is dirty
   virtual void Rebuild() = 0;
@@ -211,35 +177,34 @@ struct IPipelineState
   virtual void LoadPSO(::k3d::String const& Path) {}
 };
 
-struct IRenderPipelineState : public IPipelineState
+struct NGFXRenderPipelineState : public NGFXPipelineState
 {
-  virtual ~IRenderPipelineState() {}
+  virtual ~NGFXRenderPipelineState() {}
 
   virtual void SetRasterizerState(const RasterizerState&) = 0;
   virtual void SetBlendState(const BlendState&) = 0;
   virtual void SetDepthStencilState(const DepthStencilState&) = 0;
-  virtual void SetPrimitiveTopology(const EPrimitiveType) = 0;
-  virtual void SetRenderTargetFormat(const RenderTargetFormat&) = 0;
-  virtual void SetSampler(SamplerRef) = 0;
+  virtual void SetPrimitiveTopology(const NGFXPrimitiveType) = 0;
+  virtual void SetSampler(NGFXSamplerRef) = 0;
 };
 
-struct IComputePipelineState : public IPipelineState
+struct NGFXComputePipelineState : public NGFXPipelineState
 {
-  virtual ~IComputePipelineState() {}
+  virtual ~NGFXComputePipelineState() {}
 };
 
-using PipelineLayoutDesc = shc::BindingTable;
+using PipelineLayoutDesc = NGFXShaderBindingTable;
 
 struct AttachmentDesc
 {
   AttachmentDesc()
-    : LoadAction(ELA_Clear)
-    , StoreAction(ESA_Store)
+    : LoadAction(NGFX_LOAD_ACTION_CLEAR)
+    , StoreAction(NGFX_STORE_ACTION_STORE)
   {
   }
-  ELoadAction LoadAction;
-  EStoreAction StoreAction;
-  TextureRef pTexture;
+  NGFXLoadAction LoadAction;
+  NGFXStoreAction StoreAction;
+  NGFXTextureRef pTexture;
 };
 
 struct ColorAttachmentDesc : public AttachmentDesc
@@ -266,12 +231,22 @@ struct RenderPassDesc
   SharedPtr<StencilAttachmentDesc> pStencilAttachment;
 };
 
-struct IRenderPass : public IObject
+struct AttachmentDescriptor : public NGFXRefCounted<false>
+{
+  
+};
+
+struct RenderPassDescriptor : public NGFXRefCounted<false>
+{
+  
+};
+
+struct NGFXRenderpass : public IObject
 {
   virtual RenderPassDesc GetDesc() const = 0;
 };
 
-struct IDevice : public IObject
+struct NGFXDevice : public IObject
 {
   enum Result
   {
@@ -279,60 +254,61 @@ struct IDevice : public IObject
     DeviceFound
   };
 
-  virtual ~IDevice() {}
+  virtual ~NGFXDevice() {}
 
-  virtual GpuResourceRef CreateResource(ResourceDesc const&) = 0;
-  virtual ShaderResourceViewRef CreateShaderResourceView(
-    GpuResourceRef,
+  virtual NGFXResourceRef CreateResource(ResourceDesc const&) = 0;
+  virtual NGFXSRVRef CreateShaderResourceView(
+    NGFXResourceRef,
     SRVDesc const&) = 0;
 
-  virtual UnorderedAccessViewRef CreateUnorderedAccessView(const GpuResourceRef&, UAVDesc const&) = 0;
+  virtual NGFXUAVRef CreateUnorderedAccessView(const NGFXResourceRef&, UAVDesc const&) = 0;
 
-  virtual SamplerRef CreateSampler(const SamplerState&) = 0;
+  virtual NGFXSamplerRef CreateSampler(const SamplerState&) = 0;
 
-  virtual PipelineLayoutRef CreatePipelineLayout(
+  virtual NGFXPipelineLayoutRef CreatePipelineLayout(
     PipelineLayoutDesc const& table) = 0;
-  virtual SyncFenceRef CreateFence() = 0;
+  virtual NGFXFenceRef CreateFence() = 0;
 
-//  virtual RenderTargetRef NewRenderTarget(RenderTargetLayout const&) = 0;
+//  virtual NGFXRenderTargetRef NewRenderTarget(RenderTargetLayout const&) = 0;
 
-  virtual RenderPassRef CreateRenderPass(RenderPassDesc const&) = 0;
+  virtual NGFXRenderpassRef CreateRenderPass(RenderPassDesc const&) = 0;
 
-  virtual PipelineStateRef CreateRenderPipelineState(
+  virtual NGFXPipelineStateRef CreateRenderPipelineState(
     RenderPipelineStateDesc const&,
-    PipelineLayoutRef,
-    RenderPassRef) = 0;
+    NGFXPipelineLayoutRef,
+    NGFXRenderpassRef) = 0;
 
-  virtual PipelineStateRef CreateComputePipelineState(
+  virtual NGFXPipelineStateRef CreateComputePipelineState(
     ComputePipelineStateDesc const&,
-    PipelineLayoutRef) = 0;
+    NGFXPipelineLayoutRef) = 0;
 
-  virtual CommandQueueRef CreateCommandQueue(ECommandType const&) = 0;
+  virtual NGFXCommandQueueRef CreateCommandQueue(NGFXCommandType const&) = 0;
 
   virtual void WaitIdle() {}
 
-  /* equal with d3d12's getcopyfootprint or vulkan's getImagesubreslayout.
+  /**
+   * equal with d3d12's getcopyfootprint or vulkan's getImagesubreslayout.
    */
-  virtual void QueryTextureSubResourceLayout(TextureRef,
-                                             TextureSpec const& spec,
-                                             SubResourceLayout*)
-  {
-  }
+  virtual void QueryTextureSubResourceLayout(
+    NGFXTextureRef,
+    TextureSpec const& spec,
+    SubResourceLayout*) 
+  {}
 };
 
-struct IFactory : public IObject
+struct NGFXFactory : public IObject
 {
-  virtual void EnumDevices(k3d::DynArray<DeviceRef>& Devices) = 0;
-  virtual SwapChainRef CreateSwapchain(CommandQueueRef pCommandQueue,
+  virtual void EnumDevices(k3d::DynArray<NGFXDeviceRef>& Devices) = 0;
+  virtual NGFXSwapChainRef CreateSwapchain(NGFXCommandQueueRef pCommandQueue,
                                        void* nPtr,
                                        SwapChainDesc&) = 0;
 };
 
-struct ISwapChain : public IObject
+struct NGFXSwapChain : public IObject
 {
   virtual void Resize(uint32 Width, uint32 Height) = 0;
   virtual void Present() = 0;
-  virtual TextureRef GetCurrentTexture() = 0;
+  virtual NGFXTextureRef GetCurrentTexture() = 0;
 };
 
 struct TextureCopyLocation
@@ -346,13 +322,13 @@ struct TextureCopyLocation
     ESubResourceFootPrints
   };
 
-  TextureCopyLocation(GpuResourceRef ptrResource, ResIds subResourceIndex)
+  TextureCopyLocation(NGFXResourceRef ptrResource, ResIds subResourceIndex)
     : pResource(ptrResource)
     , SubResourceIndexes(subResourceIndex)
   {
   }
 
-  TextureCopyLocation(GpuResourceRef ptrResource, ResFootprints footprints)
+  TextureCopyLocation(NGFXResourceRef ptrResource, ResFootprints footprints)
     : pResource(ptrResource)
     , SubResourceFootPrints(footprints)
   {
@@ -362,59 +338,59 @@ struct TextureCopyLocation
 
   ~TextureCopyLocation() {}
 
-  GpuResourceRef pResource;
+  NGFXResourceRef pResource;
   ESubResource SubResourceType = ESubResourceIndex;
   ResIds SubResourceIndexes;
   ResFootprints SubResourceFootPrints;
 };
 
-struct ICommandQueue
+struct NGFXCommandQueue
 {
-  virtual CommandBufferRef ObtainCommandBuffer(ECommandUsageType const&) = 0;
+  virtual NGFXCommandBufferRef ObtainCommandBuffer(NGFXCommandReuseType const&) = 0;
 };
 
-struct ICommandBuffer : public IObject
+struct NGFXCommandBuffer : public IObject
 {
-  virtual void Commit(SyncFenceRef pFence = nullptr) = 0;
+  virtual void Commit(NGFXFenceRef pFence = nullptr) = 0;
   // For Vulkan, This command will be appended to the tail
-  virtual void Present(SwapChainRef pSwapChain, SyncFenceRef pFence) = 0;
+  virtual void Present(NGFXSwapChainRef pSwapChain, NGFXFenceRef pFence) = 0;
   virtual void Reset() = 0;
-  virtual RenderCommandEncoderRef RenderCommandEncoder(
+  virtual NGFXRenderCommandEncoderRef RenderCommandEncoder(
     RenderPassDesc const&) = 0;
-  virtual ComputeCommandEncoderRef ComputeCommandEncoder() = 0;
-  virtual ParallelRenderCommandEncoderRef ParallelRenderCommandEncoder(
+  virtual NGFXComputeCommandEncoderRef ComputeCommandEncoder() = 0;
+  virtual NGFXParallelRenderCommandEncoderRef ParallelRenderCommandEncoder(
     RenderPassDesc const&) = 0;
   // blit
   virtual void CopyTexture(const TextureCopyLocation& Dest,
                            const TextureCopyLocation& Src) = 0;
   //
-  virtual void CopyBuffer(GpuResourceRef Dest,
-                          GpuResourceRef Src,
+  virtual void CopyBuffer(NGFXResourceRef Dest,
+                          NGFXResourceRef Src,
                           CopyBufferRegion const& Region) = 0;
-  virtual void Transition(GpuResourceRef pResource,
-                          EResourceState const&
+  virtual void Transition(NGFXResourceRef pResource,
+                          NGFXResourceState const&
                             State /*, rhi::EPipelineStage const& Stage*/) = 0;
 };
 
-struct ICommandEncoder
+struct NGFXCommandEncoder
 {
-  virtual void SetPipelineState(uint32 HashCode, PipelineStateRef const&) = 0;
-  virtual void SetBindingGroup(BindingGroupRef const&) = 0;
+  virtual void SetPipelineState(uint32 HashCode, NGFXPipelineStateRef const&) = 0;
+  virtual void SetBindingGroup(NGFXBindingGroupRef const&) = 0;
   virtual void EndEncode() = 0;
 };
 
-struct IRenderCommandEncoder : public ICommandEncoder
+struct NGFXRenderCommandEncoder : public NGFXCommandEncoder
 {
   virtual void SetScissorRect(const Rect&) = 0;
   virtual void SetViewport(const ViewportDesc&) = 0;
   virtual void SetIndexBuffer(const IndexBufferView& IBView) = 0;
   virtual void SetVertexBuffer(uint32 Slot, const VertexBufferView& VBView) = 0;
-  virtual void SetPrimitiveType(EPrimitiveType) = 0;
+  virtual void SetPrimitiveType(NGFXPrimitiveType) = 0;
   virtual void DrawInstanced(DrawInstancedParam) = 0;
   virtual void DrawIndexedInstanced(DrawIndexedInstancedParam) = 0;
 };
 
-struct IComputeCommandEncoder : public ICommandEncoder
+struct NGFXComputeCommandEncoder : public NGFXCommandEncoder
 {
   virtual void Dispatch(uint32 GroupCountX,
                         uint32 GroupCountY,
@@ -422,9 +398,9 @@ struct IComputeCommandEncoder : public ICommandEncoder
 };
 // Begin with a single rendering pass, encoded from multiple threads
 // simultaneously.
-struct IParallelRenderCommandEncoder : public ICommandEncoder
+struct NGFXParallelRenderCommandEncoder : public NGFXCommandEncoder
 {
-  virtual RenderCommandEncoderRef SubRenderCommandEncoder() = 0;
+  virtual NGFXRenderCommandEncoderRef SubRenderCommandEncoder() = 0;
 };
 
 }

@@ -43,7 +43,7 @@ public:
   void OnUpdate() override;
 
 protected:
-  k3d::GpuResourceRef CreateStageBuffer(uint64 size);
+  k3d::NGFXResourceRef CreateStageBuffer(uint64 size);
   void LoadTexture();
   void PrepareResource();
   void PreparePipeline();
@@ -51,14 +51,14 @@ protected:
 
 private:
   SharedPtr<CubeMesh> m_CubeMesh;
-  k3d::GpuResourceRef m_ConstBuffer;
+  k3d::NGFXResourceRef m_ConstBuffer;
   SharedPtr<TextureObject> m_Texture;
   ConstantBuffer m_HostBuffer;
 
-  k3d::PipelineStateRef m_pPso;
-  k3d::PipelineLayoutRef m_pl;
-  k3d::BindingGroupRef m_BindingGroup;
-  k3d::SyncFenceRef m_pFence;
+  k3d::NGFXPipelineStateRef m_pPso;
+  k3d::NGFXPipelineLayoutRef m_pl;
+  k3d::NGFXBindingGroupRef m_BindingGroup;
+  k3d::NGFXFenceRef m_pFence;
 };
 
 K3D_APP_MAIN(TCubeUnitTest);
@@ -75,21 +75,23 @@ public:
   typedef std::vector<Vertex> VertexList;
   typedef std::vector<uint32> IndiceList;
 
-  explicit CubeMesh(k3d::DeviceRef device)
-    : m_pDevice(device)
-    , vbuf(nullptr)
+  explicit CubeMesh(NGFXDeviceRef device)
+    : vbuf(nullptr)
+    , m_pDevice(device)
   {
-    m_szVBuf = sizeof(CubeMesh::Vertex) * m_VertexBuffer.size();
-    m_IAState.Attribs[0] = { k3d::EVF_Float3x32, 0, 0 };
-    m_IAState.Attribs[1] = { k3d::EVF_Float4x32, sizeof(float) * 3, 0 };
-    m_IAState.Attribs[2] = { k3d::EVF_Float2x32, sizeof(float) * 7, 0 };
+    m_szVBuf = sizeof(Vertex) * m_VertexBuffer.size();
+    m_IAState.Attribs[0] = {NGFX_VERTEX_FORMAT_FLOAT3X32, 0, 0};
+    m_IAState.Attribs[1] = {NGFX_VERTEX_FORMAT_FLOAT4X32, sizeof(float) * 3, 0};
+    m_IAState.Attribs[2] = {NGFX_VERTEX_FORMAT_FLOAT2X32, sizeof(float) * 7, 0};
 
-    m_IAState.Layouts[0] = { k3d::EVIR_PerVertex, sizeof(Vertex) };
+    m_IAState.Layouts[0] = {NGFX_VERTEX_INPUT_RATE_PER_VERTEX, sizeof(Vertex)};
   }
 
-  ~CubeMesh() {}
+  ~CubeMesh()
+  {
+  }
 
-  const k3d::VertexInputState& GetInputState() const { return m_IAState; }
+  const VertexInputState& GetInputState() const { return m_IAState; }
 
   void Upload();
 
@@ -161,9 +163,9 @@ private:
     { -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f },
   };
 
-  k3d::GpuResourceRef vbuf;
+  k3d::NGFXResourceRef vbuf;
   uint64 vboLoc;
-  k3d::DeviceRef m_pDevice;
+  k3d::NGFXDeviceRef m_pDevice;
 };
 
 void
@@ -171,10 +173,9 @@ CubeMesh::Upload()
 {
   // create stage buffers
   k3d::ResourceDesc stageDesc;
-  stageDesc.ViewType = k3d::EGpuMemViewType::EGVT_Undefined;
-  stageDesc.CreationFlag = k3d::EGpuResourceCreationFlag::EGRCF_TransferSrc;
-  stageDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostCoherent |
-                   k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
+  stageDesc.ViewFlags = NGFX_RESOURCE_VIEW_UNDEFINED;
+  stageDesc.CreationFlag = NGFX_RESOURCE_TRANSFER_SRC;
+  stageDesc.Flag = NGFX_ACCESS_HOST_COHERENT | NGFX_ACCESS_HOST_VISIBLE;
   stageDesc.Size = m_szVBuf;
   auto vStageBuf = m_pDevice->CreateResource(stageDesc);
   void* ptr = vStageBuf->Map(0, m_szVBuf);
@@ -182,15 +183,15 @@ CubeMesh::Upload()
   vStageBuf->UnMap();
 
   k3d::ResourceDesc bufferDesc;
-  bufferDesc.ViewType = k3d::EGpuMemViewType::EGVT_VBV;
+  bufferDesc.ViewFlags = NGFX_RESOURCE_VERTEX_BUFFER_VIEW;
   bufferDesc.Size = m_szVBuf;
-  bufferDesc.CreationFlag = k3d::EGpuResourceCreationFlag::EGRCF_TransferDst;
-  bufferDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_DeviceVisible;
+  bufferDesc.CreationFlag = NGFX_RESOURCE_TRANSFER_DST;
+  bufferDesc.Flag = NGFX_ACCESS_DEVICE_VISIBLE;
   vbuf = m_pDevice->CreateResource(bufferDesc);
 
-  auto pQueue = m_pDevice->CreateCommandQueue(k3d::ECMD_Graphics);
-  auto cmdBuf = pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
-  k3d::CopyBufferRegion region = { 0, 0, m_szVBuf };
+  auto pQueue = m_pDevice->CreateCommandQueue(NGFX_COMMAND_GRAPHICS);
+  auto cmdBuf = pQueue->ObtainCommandBuffer(NGFX_COMMAND_USAGE_ONE_SHOT);
+  CopyBufferRegion region = {0, 0, m_szVBuf};
   cmdBuf->CopyBuffer(vbuf, vStageBuf, region);
   cmdBuf->Commit();
   m_pDevice->WaitIdle();
@@ -219,14 +220,14 @@ TCubeUnitTest::OnInit()
   return true;
 }
 
-k3d::GpuResourceRef
+k3d::NGFXResourceRef
 TCubeUnitTest::CreateStageBuffer(uint64 size)
 {
-  k3d::ResourceDesc stageDesc;
-  stageDesc.ViewType = k3d::EGpuMemViewType::EGVT_Undefined;
-  stageDesc.CreationFlag = k3d::EGpuResourceCreationFlag::EGRCF_TransferSrc;
-  stageDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostCoherent |
-                   k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
+  ResourceDesc stageDesc;
+  stageDesc.ViewFlags = NGFX_RESOURCE_VIEW_UNDEFINED;
+  stageDesc.CreationFlag = NGFX_RESOURCE_TRANSFER_SRC;
+  stageDesc.Flag = NGFX_ACCESS_HOST_COHERENT |
+    NGFX_ACCESS_HOST_VISIBLE;
   stageDesc.Size = size;
   return m_pDevice->CreateResource(stageDesc);
 }
@@ -245,7 +246,7 @@ TCubeUnitTest::LoadTexture()
     m_Texture->CopyAndInitTexture(texStageBuf);
     k3d::SRVDesc viewDesc;
     auto srv = m_pDevice->CreateShaderResourceView(m_Texture->GetResource(), viewDesc);
-    auto texure = StaticPointerCast<k3d::ITexture>(m_Texture->GetResource()); //
+    auto texure = StaticPointerCast<k3d::NGFXTexture>(m_Texture->GetResource()); //
     texure->SetResourceView(Move(srv)); // here
     k3d::SamplerState samplerDesc;
     auto sampler2D = m_pDevice->CreateSampler(samplerDesc);
@@ -260,9 +261,9 @@ TCubeUnitTest::PrepareResource()
   m_CubeMesh = MakeShared<CubeMesh>(m_pDevice);
   m_CubeMesh->Upload();
   LoadTexture();
-  k3d::ResourceDesc desc;
-  desc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
-  desc.ViewType = k3d::EGpuMemViewType::EGVT_CBV;
+  ResourceDesc desc;
+  desc.Flag = NGFX_ACCESS_HOST_VISIBLE;
+  desc.ViewFlags = NGFX_RESOURCE_CONSTANT_BUFFER_VIEW;
   desc.Size = sizeof(ConstantBuffer);
   m_ConstBuffer = m_pDevice->CreateResource(desc);
   MVPMatrix* ptr = (MVPMatrix*)m_ConstBuffer->Map(0, sizeof(ConstantBuffer));
@@ -284,9 +285,9 @@ TCubeUnitTest::PrepareResource()
 void
 TCubeUnitTest::PreparePipeline()
 {
-  k3d::ShaderBundle vertSh, fragSh;
-  Compile("asset://Test/cube.vert", k3d::ES_Vertex, vertSh);
-  Compile("asset://Test/cube.frag", k3d::ES_Fragment, fragSh);
+  NGFXShaderBundle vertSh, fragSh;
+  Compile("asset://Test/cube.vert", NGFX_SHADER_TYPE_VERTEX, vertSh);
+  Compile("asset://Test/cube.frag", NGFX_SHADER_TYPE_FRAGMENT, fragSh);
   auto vertBinding = vertSh.BindingTable;
   auto fragBinding = fragSh.BindingTable;
   auto mergedBindings = vertBinding | fragBinding;
@@ -295,19 +296,19 @@ TCubeUnitTest::PreparePipeline()
   m_BindingGroup->Update(0, m_ConstBuffer);
   m_BindingGroup->Update(1, m_Texture->GetResource());
 
-  k3d::RenderPipelineStateDesc desc;
+  RenderPipelineStateDesc desc;
   desc.AttachmentsBlend.Append(AttachmentState());
   desc.VertexShader = vertSh;
   desc.PixelShader = fragSh;
   desc.InputState = m_CubeMesh->GetInputState();
 
-  k3d::ColorAttachmentDesc ColorAttach;
+  ColorAttachmentDesc ColorAttach;
   ColorAttach.pTexture = m_pSwapChain->GetCurrentTexture();
-  ColorAttach.LoadAction = k3d::ELA_Clear;
-  ColorAttach.StoreAction = k3d::ESA_Store;
+  ColorAttach.LoadAction = NGFX_LOAD_ACTION_CLEAR;
+  ColorAttach.StoreAction = NGFX_STORE_ACTION_STORE;
   ColorAttach.ClearColor = Vec4f(1, 1, 1, 1);
 
-  k3d::RenderPassDesc Desc;
+  RenderPassDesc Desc;
   Desc.ColorAttachments.Append(ColorAttach);
   auto pRenderPass = m_pDevice->CreateRenderPass(Desc);
 
@@ -352,25 +353,25 @@ TCubeUnitTest::OnUpdate()
 
   auto currentImage = m_pSwapChain->GetCurrentTexture();
   auto ImageDesc = currentImage->GetDesc();
-  k3d::ColorAttachmentDesc ColorAttach;
+  ColorAttachmentDesc ColorAttach;
   ColorAttach.pTexture = currentImage;
-  ColorAttach.LoadAction = k3d::ELA_Clear;
-  ColorAttach.StoreAction = k3d::ESA_Store;
+  ColorAttach.LoadAction = NGFX_LOAD_ACTION_CLEAR;
+  ColorAttach.StoreAction = NGFX_STORE_ACTION_STORE;
   ColorAttach.ClearColor = Vec4f(1, 1, 1, 1);
 
-  k3d::RenderPassDesc Desc;
+  RenderPassDesc Desc;
   Desc.ColorAttachments.Append(ColorAttach);
 
-  auto commandBuffer = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
+  auto commandBuffer = m_pQueue->ObtainCommandBuffer(NGFX_COMMAND_USAGE_ONE_SHOT);
   // command encoder like Metal does, should use desc instead, look obj from cache
   auto renderCmd = commandBuffer->RenderCommandEncoder(Desc);
   renderCmd->SetBindingGroup(m_BindingGroup);
-  k3d::Rect rect{ 0, 0, ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height };
+  Rect rect{0, 0, ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height};
   renderCmd->SetScissorRect(rect);
-  renderCmd->SetViewport(k3d::ViewportDesc(ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height));
+  renderCmd->SetViewport(ViewportDesc(ImageDesc.TextureDesc.Width, ImageDesc.TextureDesc.Height));
   renderCmd->SetPipelineState(0, m_pPso);
   renderCmd->SetVertexBuffer(0, m_CubeMesh->VBO());
-  renderCmd->DrawInstanced(k3d::DrawInstancedParam(36, 1));
+  renderCmd->DrawInstanced(DrawInstancedParam(36, 1));
   renderCmd->EndEncode();
 
   commandBuffer->Present(m_pSwapChain, m_pFence);

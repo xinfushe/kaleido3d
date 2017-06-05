@@ -49,18 +49,18 @@ private:
   k3d::IShCompiler::Ptr m_Compiler;
   std::unique_ptr<TriangleMesh> m_TriMesh;
 
-  k3d::GpuResourceRef m_pDepthStencilTexture;
+  k3d::NGFXResourceRef m_pDepthStencilTexture;
 
-  k3d::GpuResourceRef m_ConstBuffer;
+  k3d::NGFXResourceRef m_ConstBuffer;
   ConstantBuffer m_HostBuffer;
 
-  k3d::PipelineStateRef m_pPso;
-  k3d::PipelineLayoutRef m_pl;
-  k3d::BindingGroupRef m_BindingGroup;
+  k3d::NGFXPipelineStateRef m_pPso;
+  k3d::NGFXPipelineLayoutRef m_pl;
+  k3d::NGFXBindingGroupRef m_BindingGroup;
   k3d::RenderPassDesc m_RenderPassDesc;
-  k3d::RenderPassRef m_pRenderPass;
+  k3d::NGFXRenderpassRef m_pRenderPass;
 
-  k3d::SyncFenceRef m_pFence;
+  k3d::NGFXFenceRef m_pFence;
 };
 
 K3D_APP_MAIN(TriangleDSApp)
@@ -76,7 +76,7 @@ public:
   typedef std::vector<Vertex> VertexList;
   typedef std::vector<uint32> IndiceList;
 
-  explicit TriangleMesh(k3d::DeviceRef device)
+  explicit TriangleMesh(k3d::NGFXDeviceRef device)
     : m_pDevice(device)
     , vbuf(nullptr)
     , ibuf(nullptr)
@@ -84,17 +84,17 @@ public:
     m_szVBuf = sizeof(TriangleMesh::Vertex) * m_VertexBuffer.size();
     m_szIBuf = sizeof(uint32) * m_IndexBuffer.size();
 
-    m_IAState.Attribs[0] = { k3d::EVF_Float3x32, 0, 0 };
-    m_IAState.Attribs[1] = { k3d::EVF_Float3x32, sizeof(float) * 3, 0 };
+    m_IAState.Attribs[0] = { NGFX_VERTEX_FORMAT_FLOAT3X32, 0, 0 };
+    m_IAState.Attribs[1] = { NGFX_VERTEX_FORMAT_FLOAT3X32, sizeof(float) * 3, 0 };
 
-    m_IAState.Layouts[0] = { k3d::EVIR_PerVertex, sizeof(Vertex) };
+    m_IAState.Layouts[0] = { NGFX_VERTEX_INPUT_RATE_PER_VERTEX, sizeof(Vertex) };
   }
 
   ~TriangleMesh() {}
 
   const k3d::VertexInputState& GetInputState() const { return m_IAState; }
 
-  void Upload(k3d::CommandQueueRef pQueue);
+  void Upload(k3d::NGFXCommandQueueRef pQueue);
 
   void SetLoc(uint64 ibo, uint64 vbo)
   {
@@ -127,19 +127,19 @@ private:
   uint64 iboLoc;
   uint64 vboLoc;
 
-  k3d::DeviceRef m_pDevice;
-  k3d::GpuResourceRef vbuf, ibuf;
+  k3d::NGFXDeviceRef m_pDevice;
+  k3d::NGFXResourceRef vbuf, ibuf;
 };
 
 void
-TriangleMesh::Upload(k3d::CommandQueueRef pQueue)
+TriangleMesh::Upload(k3d::NGFXCommandQueueRef pQueue)
 {
   // create stage buffers
   k3d::ResourceDesc stageDesc;
-  stageDesc.ViewType = k3d::EGpuMemViewType::EGVT_Undefined;
-  stageDesc.CreationFlag = k3d::EGpuResourceCreationFlag::EGRCF_TransferSrc;
-  stageDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostCoherent |
-                   k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
+  stageDesc.ViewFlags = NGFX_RESOURCE_VIEW_UNDEFINED;
+  stageDesc.CreationFlag = NGFX_RESOURCE_TRANSFER_SRC;
+  stageDesc.Flag = NGFX_ACCESS_HOST_COHERENT |
+                   NGFX_ACCESS_HOST_VISIBLE;
   stageDesc.Size = m_szVBuf;
   auto vStageBuf = m_pDevice->CreateResource(stageDesc);
   void* ptr = vStageBuf->Map(0, m_szVBuf);
@@ -153,16 +153,16 @@ TriangleMesh::Upload(k3d::CommandQueueRef pQueue)
   iStageBuf->UnMap();
 
   k3d::ResourceDesc bufferDesc;
-  bufferDesc.ViewType = k3d::EGpuMemViewType::EGVT_VBV;
+  bufferDesc.ViewFlags = NGFX_RESOURCE_VERTEX_BUFFER_VIEW;
   bufferDesc.Size = m_szVBuf;
-  bufferDesc.CreationFlag = k3d::EGpuResourceCreationFlag::EGRCF_TransferDst;
-  bufferDesc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_DeviceVisible;
+  bufferDesc.CreationFlag = NGFX_RESOURCE_TRANSFER_DST;
+  bufferDesc.Flag = NGFX_ACCESS_DEVICE_VISIBLE;
   vbuf = m_pDevice->CreateResource(bufferDesc);
-  bufferDesc.ViewType = k3d::EGpuMemViewType::EGVT_IBV;
+  bufferDesc.ViewFlags = NGFX_RESOURCE_INDEX_BUFFER_VIEW;
   bufferDesc.Size = m_szIBuf;
   ibuf = m_pDevice->CreateResource(bufferDesc);
 
-  auto cmd = pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
+  auto cmd = pQueue->ObtainCommandBuffer(NGFX_COMMAND_USAGE_ONE_SHOT);
   k3d::CopyBufferRegion region = { 0, 0, m_szVBuf };
   cmd->CopyBuffer(vbuf, vStageBuf, region);
   region.CopySize = m_szIBuf;
@@ -201,18 +201,18 @@ TriangleDSApp::PrepareResource()
   m_TriMesh->Upload(m_pQueue);
 
   k3d::ResourceDesc desc;
-  desc.Flag = k3d::EGpuResourceAccessFlag::EGRAF_HostVisible;
-  desc.ViewType = k3d::EGpuMemViewType::EGVT_CBV;
+  desc.Flag = NGFX_ACCESS_HOST_VISIBLE;
+  desc.ViewFlags = NGFX_RESOURCE_CONSTANT_BUFFER_VIEW;
   desc.Size = sizeof(ConstantBuffer);
   m_ConstBuffer = m_pDevice->CreateResource(desc);
   OnUpdate();
 
-  desc.Flag = EGRAF_DeviceVisible;
-  desc.Type = EGT_Texture2D;
-  desc.ViewType = EGVT_DSV;
+  desc.Flag = NGFX_ACCESS_DEVICE_VISIBLE;
+  desc.Type = NGFX_TEXTURE_2D;
+  desc.ViewFlags = NGFX_RESOURCE_DEPTH_STENCIL_VIEW;
 
   auto SwSize = m_pSwapChain->GetCurrentTexture()->GetDesc().TextureDesc;
-  desc.TextureDesc = { EPF_D24_S8, SwSize.Width, SwSize.Height, 1, 1, 1 };
+  desc.TextureDesc = { NGFX_PIXEL_FORMAT_D24_S8, SwSize.Width, SwSize.Height, 1, 1, 1 };
   m_pDepthStencilTexture = m_pDevice->CreateResource(desc);
 }
 
@@ -221,22 +221,22 @@ TriangleDSApp::PrepareRenderPass()
 {
   k3d::ColorAttachmentDesc ColorAttach;
   ColorAttach.pTexture = m_pSwapChain->GetCurrentTexture();
-  ColorAttach.LoadAction = k3d::ELA_Clear;
-  ColorAttach.StoreAction = k3d::ESA_Store;
+  ColorAttach.LoadAction = NGFX_LOAD_ACTION_CLEAR;
+  ColorAttach.StoreAction = NGFX_STORE_ACTION_STORE;
   ColorAttach.ClearColor = Vec4f(1, 1, 1, 1);
   m_RenderPassDesc.ColorAttachments.Append(ColorAttach);
  
   m_RenderPassDesc.pDepthAttachment = MakeShared<DepthAttachmentDesc>();
-  m_RenderPassDesc.pDepthAttachment->LoadAction = k3d::ELA_Clear;
-  m_RenderPassDesc.pDepthAttachment->StoreAction = k3d::ESA_Store;
+  m_RenderPassDesc.pDepthAttachment->LoadAction = NGFX_LOAD_ACTION_CLEAR;
+  m_RenderPassDesc.pDepthAttachment->StoreAction = NGFX_STORE_ACTION_STORE;
   m_RenderPassDesc.pDepthAttachment->ClearDepth = 1.0f;
-  m_RenderPassDesc.pDepthAttachment->pTexture = StaticPointerCast<k3d::ITexture>(m_pDepthStencilTexture);
+  m_RenderPassDesc.pDepthAttachment->pTexture = StaticPointerCast<k3d::NGFXTexture>(m_pDepthStencilTexture);
 
   m_RenderPassDesc.pStencilAttachment = MakeShared<StencilAttachmentDesc>();
-  m_RenderPassDesc.pStencilAttachment->LoadAction = k3d::ELA_Clear;
-  m_RenderPassDesc.pStencilAttachment->StoreAction = k3d::ESA_Store;
+  m_RenderPassDesc.pStencilAttachment->LoadAction = NGFX_LOAD_ACTION_CLEAR;
+  m_RenderPassDesc.pStencilAttachment->StoreAction = NGFX_STORE_ACTION_STORE;
   m_RenderPassDesc.pStencilAttachment->ClearStencil = 0.0f;
-  m_RenderPassDesc.pStencilAttachment->pTexture = StaticPointerCast<k3d::ITexture>(m_pDepthStencilTexture);
+  m_RenderPassDesc.pStencilAttachment->pTexture = StaticPointerCast<k3d::NGFXTexture>(m_pDepthStencilTexture);
 
   m_pRenderPass = m_pDevice->CreateRenderPass(m_RenderPassDesc);
 }
@@ -244,9 +244,9 @@ TriangleDSApp::PrepareRenderPass()
 void
 TriangleDSApp::PreparePipeline()
 {
-  k3d::ShaderBundle vertSh, fragSh;
-  Compile("asset://Test/triangle.vert", k3d::ES_Vertex, vertSh);
-  Compile("asset://Test/triangle.frag", k3d::ES_Fragment, fragSh);
+  k3d::NGFXShaderBundle vertSh, fragSh;
+  Compile("asset://Test/triangle.vert", NGFX_SHADER_TYPE_VERTEX, vertSh);
+  Compile("asset://Test/triangle.frag", NGFX_SHADER_TYPE_FRAGMENT, fragSh);
   k3d::PipelineLayoutDesc ppldesc = vertSh.BindingTable;
   m_pl = m_pDevice->CreatePipelineLayout(ppldesc);
   if (m_pl) {
@@ -284,7 +284,7 @@ TriangleDSApp::OnProcess(Message& msg)
   auto currentImage = m_pSwapChain->GetCurrentTexture();
   auto ImageDesc = currentImage->GetDesc();
   m_RenderPassDesc.ColorAttachments[0].pTexture = currentImage;
-  auto commandBuffer = m_pQueue->ObtainCommandBuffer(k3d::ECMDUsage_OneShot);
+  auto commandBuffer = m_pQueue->ObtainCommandBuffer(NGFX_COMMAND_USAGE_ONE_SHOT);
   // command encoder like Metal does, should use desc instead, look obj from cache
   auto renderCmd = commandBuffer->RenderCommandEncoder(m_RenderPassDesc);
   renderCmd->SetBindingGroup(m_BindingGroup);

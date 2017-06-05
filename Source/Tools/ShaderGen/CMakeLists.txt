@@ -7,6 +7,7 @@ set(COMPILER_SRCS
     Private/GLSLangUtils.h Private/GLSLangUtils.cc
     Private/SPIRVCrossUtils.h Private/SPIRVCrossUtils.cc
     Private/MetalCompiler.cc Private/MetalCompiler.h
+	../../../Include/Interface/ShaderCommon.h
 )
 
 source_group("Compiler\\Private" FILES ${COMPILER_SRCS})

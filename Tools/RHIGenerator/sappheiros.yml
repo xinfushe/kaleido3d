@@ -1,0 +1,859 @@
+namespace: sph
+protype:
+    - result:
+        type: enum
+        comment: Result of every call
+        enums:
+            - Ok
+            - Failed
+            - Param Error
+            - Device Not Found
+
+    - pipeline type:
+        type: enum
+        enums:
+            - Graphics
+            - Compute
+
+    - pixel format:
+        type: enum
+        comment: Pixel format in storage
+        enums:
+            - RGBA16Uint
+            - RGBA32Float
+            - RGBA8UNorm
+            - RGBA8UNorm_sRGB
+            - R11G11B10Float
+            - D32Float
+            - RGB32Float
+
+    - vertex format:
+        type: enum
+        enums:
+            - 32F
+            - 32F2
+            - 32F3
+            - 32F4
+
+    - primitive type:
+        type: enum
+        enums: 
+            - Points
+            - Lines
+            - Triangles
+            - TriangleStrips
+
+    - blend operation:
+        type: enum
+        enums:
+            - Add
+            - Sub
+
+    - blend type:
+        type: enum
+        comment: Color blending
+        enums:
+            - Zero
+            - One
+            - Src Color
+            - Dest Color
+            - Src Alpha
+            - Desc Alpha
+
+    - stencil operation:
+        type: enum
+        enums:
+            - Keep
+            - Zero
+            - Replace
+            - Invert
+            - Increment
+            - Decrement
+
+    - comparison function:
+        type: enum
+        enums:
+            - Never
+            - Less
+            - Equal
+            - Less Equal
+            - Greater
+            - Not Equal
+            - Greater Equal
+            - Always
+    
+    - depth stencil op:
+        type: struct
+        members:
+            - name: stencilFailOp
+              type: stencil operation
+            - name: depthStencilFailOp
+              type: stencil operation
+            - name: stencilPassOp
+              type: stencil operation
+            - name: stencilFunc
+              type: comparison function
+
+    - depth write mask:
+        type: enum
+        enums:
+            - Zero
+            - All
+
+    - resource state:
+        type: enum
+        bitmask: true
+        enums: 
+            - Common
+            - Vertex Buffer
+            - Constant Buffer
+            - Render Target
+            - Pixel Shader Resource
+            - Transfer Source
+            - Transfer Dest
+            - Present
+            - Generic Read
+            - Unorder Access
+
+    - resource view type:
+        type: enum
+        enums:
+            - Linear Buffer
+            - Sampled Texture
+            - Unorder Access Texture
+            - Unorder Access Buffer
+    
+    - texture dimension:
+        type: enum
+        enums:
+            - 1D
+            - 2D
+            - 2D MS
+            - 2D Array
+            - 3D
+            - 3D Array
+            - Cube
+
+    - fill mode:
+        type: enum
+        enums:
+            - Wire
+            - Solid
+
+    - cull mode:
+        type: enum
+        enums:
+            - None
+            - Front
+            - Back
+
+    - rasterizer state:
+        type: struct
+        members:
+            - name: fillMode
+              type: fill mode
+              default: Solid
+            - name: cullMode
+              type: cull mode
+              default: Back
+            - name: frontCCW
+              type: bool
+              default: true
+            - name: depthBias
+              type: int32_t
+              default: 0
+            - name: multiSampleEnable
+              type: bool
+              default: false
+
+    - blend state:
+        type: struct
+        members:
+            - name: enable
+              type: bool
+              default: false
+            - name: srcColorBlend
+              type: blend type
+              default: Src Color
+            - name: destColorBlend
+              type: blend type
+              default: Dest Color
+            - name: colorBlendOp
+              type: blend operation
+              default: Add
+            - name: srcAlphaBlend
+              type: blend type
+            - name: destAlphaBlend
+              type: blend type
+            - name: alphaBlendOp
+              type: blend operation
+            - name: colorWriteMask
+              type: uint32_t
+              default: 0xF
+
+    - depth stencil state:
+        type: struct
+        members:
+            - name: depthEnable
+              type: bool
+              default: true
+            - name: depthWriteMask
+              type: depth write mask
+              default: All
+            - name: depthFunc
+              type: comparison function
+              default: Greater
+            - name: stencilEnable
+              type: bool
+              default: true
+            - name: frontFace
+              type: depth stencil op
+            - name: backFace
+              type: depth stencil op
+
+    - filter mode:
+        type: enum
+        enums:
+            - Point
+            - Linear
+
+    - address mode:
+        type: enum
+        enums:
+            - Wrap
+            - Mirror
+            - Clamp
+            - Border
+            - Mirror Once
+    
+    - device desc:
+        type: struct
+        members:
+            - name: maxAllocation
+              type: uint64_t
+              default: 0
+            - name: vendorName
+              type: char *
+              default: nullptr
+
+    - filter:
+        type: struct
+        members:
+            - name: minFilter
+              type: filter mode
+              default: Linear
+            - name: magFilter
+              type: filter mode
+              default: Linear
+            - name: mipMapFilter
+              type: filter mode
+              default: Linear
+
+    - sampler desc:
+        type: struct
+        comment: Description of sampler
+        members:
+            - name: filter
+              type: filter
+            - name: U,V,W
+              type: address mode
+              default: Wrap
+            - name: mipLodBias
+              type: float32
+            - name: maxAnistropy
+              type: uint32_t
+            - name: comparisonFunc
+              type: comparison function
+            - name: minLod
+              type: float32
+              default: 0
+            - name: maxLod
+              type: float32
+              default: 0x7FFF
+
+    - buffer desc:
+        type: struct
+        comment: Description of a buffer
+        members:
+            - name: size
+              type: uint64_t
+
+    - buffer view desc:
+        type: struct
+        comment: Description of the buffer usage
+        members:
+            - name: view
+              type: resource view type
+            - name: state
+              type: resource state
+            - name: size
+              type: uint64_t
+            - name: offset
+              type: uint64_t
+            - name: stride
+              type: uint64_t
+
+    - texture desc:
+        type: struct
+        comment: Description of a texture
+        members:
+            - name: format
+              type: pixel format
+            - name: width
+              type: uint32_t
+            - name: height
+              type: uint32_t
+            - name: depth
+              type: uint32_t
+            - name: layers
+              type: uint32_t
+            - name: mipLevels
+              type: uint32_t
+
+    - texture view desc:
+        type: struct
+        comment: Description about how the texture be used
+        members:
+            - name: view
+              type: resource view type
+            - name: state
+              type: resource state
+            - name: dimension
+              type: texture dimension
+            - name: mipLevel
+              type: uint32_t
+
+    - vertex input rate:
+        type: enum
+        enums:
+            - PerVertex
+            - PerInstance
+
+    - vertex layout:
+        type: struct
+        members:
+            - name: rate
+              type: vertex input rate
+            - name: stride
+              type: uint32_t
+
+    - vertex attribute:
+        type: struct
+        members:
+            - name: format
+              type: vertex format
+            - name: offset
+              type: uint32_t
+            - name: slot
+              type: uint32_t
+
+    - vertex input state:
+        type: struct
+        comment: Vertex input description
+        members:
+            - name: pAttributes
+              type: const vertex attribute *
+            - name: attributeCount
+              type: uint32_t
+            - name: pLayouts
+              type: const vertex layout *
+            - name: layoutCount
+              type: uint32_t
+
+    - pipeline state desc:
+        type: struct
+        comment: Description of pipeline state
+        members:
+            - name: rasterState
+              type: rasterizer state
+            - name: blendState
+              type: blend state
+            - name: depthStencil
+              type: depth stencil state
+            - name: inputState
+              type: vertex input state
+            - name: primitiveTopology
+              type: primitive type
+
+    - binding type:
+        type: enum
+        enums:
+          - Uniform Buffer
+          - Sampler
+          - Sampled Image
+          - Storage Buffer
+
+    - shader stage bit:
+        type: enum
+        bitmask: true
+        enums:
+          - Vertex
+          - Fragment
+          - Compute
+          - Geometry
+          - TessailationEval
+          - TessailationControl
+
+    - pipeline layout desc:
+        type: struct
+        comment: Description of Pipeline Layout (How to layout bindings)
+        members:
+          - name: visibility
+            type: shader stage bit
+          - name: bindingType
+            type: binding type
+          - name: slot
+            type: uint32_t
+          - name: count
+            type: uint32_t
+
+    - render pass desc:
+        type: struct
+        comment: Description of Render Pass
+        members:
+          -
+  
+    - render target desc:
+        type: struct
+        comment: Description of Render Target
+        members:
+          -
+
+    - draw indexed instanced desc:
+        type: struct
+        members:
+            - name: indexCountPerInstance
+              type: uint32_t
+            - name: instanceCount
+              type: uint32_t
+            - name: startId
+              type: uint32_t
+            - name: baseVertexId
+              type: uint32_t
+            - name: startInstanceId
+              type: uint32_t
+    
+    - draw instanced desc:
+        type: struct
+        members:
+            - name: vertexCountPerInstance
+              type: uint32_t
+            - name: instanceCount
+              type: uint32_t
+            - name: startVertexId
+              type: uint32_t
+            - name: startInstanceId
+              type: uint32_t
+
+    - command queue type:
+        type: enum
+        enums:
+            - Graphics
+            - Compute
+
+    - shader type:
+        type: enum
+        comment: Type of shader
+        enums:
+            - Vertex
+            - Fragment
+            - Compute
+            - Geometry
+            - TessailationEval
+            - TessailationControl
+
+    - viewport:
+        type: struct
+        members:
+            - name: left, top
+              type: float32
+            - name: width, height
+              type: float32
+            - name: minDepth
+              type: float32
+            - name: maxDepth
+              type: float32
+
+    - swap chain desc:
+        type: struct
+        members:
+            - name: pixelFormat
+              type: pixel format
+            - name: width
+              type: uint32_t
+            - name: height
+              type: uint32_t
+
+    - ref obj:
+        type: interface
+        functions:
+            - add ref:
+                return: uint32_t
+            - release:
+                return: uint32_t
+
+    - swap chain:
+        type: interface
+        inherit: ref obj
+        comment: Present drawables
+        functions:
+            - get texture:
+                params:
+                  - name: ppTexture
+                    type: texture **
+                  - name: index
+                    type: uint32_t
+                return: result
+            - present
+
+    - factory:
+        type: interface
+        inherit: ref obj
+        comment: Create devices and swapchains
+        functions:
+            - enum device:
+                params:
+                    - name: count
+                      type: uint32_t *
+                    - name: ppDevice
+                      type: device **
+                return: result
+            - create swapchain:
+                params:
+                    - name: desc
+                      type: const swap chain desc *
+                    - name: pCommandQueue
+                      type: command queue *
+                    - name: pWindow
+                      type: void *
+                    - name: pSwapchain
+                      type: swap chain **
+                return: result
+
+    - render target:
+        type: interface
+        inherit: ref obj
+
+    - render pass:
+        type: interface
+        inherit: ref obj
+
+    - pipeline state:
+        type: interface
+        inherit: ref obj
+        functions:
+            - type:
+                return: pipeline type
+            - get desc:
+                params:
+                    - name: desc
+                      type: pipeline state desc *
+                return: result
+
+    - pipeline layout:
+        type: interface
+        inherit: ref obj
+
+    - binding table:
+        type: interface
+        inherit: ref obj
+        comment: Shader binding table
+        functions:
+            - setSampler:
+                params:
+                    - name: index
+                      type: uint32_t
+                    - name: shaderVis
+                      type: shader type
+                    - name: pSampler
+                      type: sampler *
+            - setBuffer:
+                params:
+                    - name: index
+                      type: uint32_t
+                    #- name: offset
+                    #  type: uint32_t
+                    - name: shaderVis
+                      type: shader type
+                    - name: bufferView
+                      type: buffer view *
+            - setTexture:
+                params:
+                    - name: index
+                      type: uint32_t
+                    - name: shaderVis
+                      type: shader type
+                    - name: textureView
+                      type: texture view *
+
+    # resources
+
+    - sampler:
+        type: interface
+        inherit: ref obj
+        functions:
+            - get desc:
+                params:
+                    - name: desc
+                      type: sampler desc *
+                return: result
+
+    - resource:
+        type: interface
+        inherit: ref obj
+        functions:
+            - map:
+                params:
+                    - name: offset
+                      type: uint64_t
+                    - name: size
+                      type: uint64_t
+                return: void *
+            - un map
+
+    - buffer:
+        type: interface
+        inherit: resource
+        functions:
+            - get desc:
+                params:
+                    - name: pDesc
+                      type: buffer desc *
+                return: result
+
+    - buffer view:
+        type: interface
+        inherit: ref obj
+
+    - texture:
+        type: interface
+        inherit: resource
+        functions:
+            - get desc:
+                params:
+                    - name: pDesc
+                      type: texture desc *
+                return: result
+
+    - texture view:
+        type: interface
+        inherit: ref obj
+
+    - device:
+        type: interface
+        inherit: ref obj
+        comment: Gpu device
+        functions:
+            - get desc:
+                params:
+                    - name: pDesc
+                      type: device desc *
+            - create command queue:
+                params:
+                    - name: queueType
+                      type: command queue type
+                    - name: pQueue
+                      type: command queue **
+                return: result
+            - create pipeline layout:
+                params:
+                    - name: pPipelineLayoutDesc
+                      type: const pipeline layout desc *
+                    - name: ppPipelineLayout
+                      type: pipeline layout **
+                return: result
+            - create binding table:
+                params:
+                    - name: pPipelineLayout
+                      type: pipeline layout *
+                    - name: ppBindingTable
+                      type: binding table **
+                return: result
+            - create pipeline state:
+                params:
+                    - name: pPipelineDesc
+                      type: const pipeline state desc *
+                    - name: pPipelineLayout
+                      type: pipeline layout *
+                    - name: pPipelineState
+                      type: pipeline state **
+                return: result
+            - create render pass:
+                params:
+                  - name: desc
+                    type: const render pass desc *
+                  - name: ppRenderpass
+                    type: render pass **
+                return: result
+            - create render target:
+                params:
+                  - name: desc
+                    type: const render target desc *
+                  - name: ppRenderTarget
+                    type: render target **
+                return: result
+            - create sampler:
+                params:
+                    - name: desc
+                      type: const sampler desc*
+                    - name: pSampler
+                      type: sampler **
+                return: result
+            - create buffer:
+                params:
+                    - name: desc
+                      type: const buffer desc*
+                    - name: pBuffer
+                      type: buffer **
+                return: result
+            - create buffer view:
+                params:
+                    - name: desc
+                      type: const buffer view desc *
+                    - name: pBuffer
+                      type: buffer *
+                    - name: pBufView
+                      type: buffer view **
+                return: result
+            - create texture:
+                params:
+                    - name: desc
+                      type: const texture desc *
+                    - name: pTexture
+                      type: texture **
+                return: result
+            - create texture view:
+                params:
+                    - name: desc
+                      type: const texture view desc *
+                    - name: pTexture
+                      type: texture *
+                    - name: pTexView
+                      type: texture view **
+                return: result
+            #- create shader
+            - wait idle
+
+    #device child:
+    #    type: interface
+    #    inherit: device
+    - fence:
+        type: interface
+        inherit: ref obj
+        functions:
+          - wait
+          - reset
+
+    - frame buffer:
+        type: interface
+        inherit: ref obj
+
+    - command queue:
+        type: interface
+        inherit: ref obj
+        functions:
+            - command buffer:
+                return: command buffer *
+
+    - command buffer:
+        type: interface
+        comment: Gpu Command Buffer
+        inherit: ref obj
+        functions:
+            - commit:
+                params:
+                  - type: fence *
+                    name: pFence
+            - render command encoder:
+                return: render command encoder *
+            - compute command encoder:
+                return: compute command encoder *
+            - parallel command encoder:
+                return: parallel render command encoder *
+
+    - command encoder:
+        type: interface
+        functions:
+            - copy texture:
+                params:
+                  -
+            - copy buffer:
+                params:
+                  -
+            - set pipeline state:
+                params:
+                  - name: pPipelineState
+                    type: pipeline state*
+            - set pipeline layout:
+                params:
+                  - name: pPipelineLayout
+                    type: pipeline layout *
+            - set binding table:
+                params:
+                  - name: pBindingTable
+                    type: binding table *
+            - end encode
+
+
+    - render command encoder:
+        type: interface
+        inherit: command encoder
+        comment: Render Command Encoder
+        functions:
+            - clear color depth:
+                params:
+                    - 
+            - set scissor rect:
+                params:
+                  -
+            - set viewport:
+                params:
+                    - name: pViewport
+                      type: const viewport *
+            - set index buffer:
+                    - name: pIndexBuffer
+                      type: buffer *
+            - set vertex buffer:
+                params:
+                    - name: slot
+                      type: uint32_t
+                    - name: offset
+                      type: uint64_t
+                    - name: pVertexBuffer
+                      type: buffer *
+            - set primitive type:
+                params:
+                    - name: primitive
+                      type: primitive type
+            - draw instanced:
+                params:
+                    - name: drawParam
+                      type: const draw instanced desc *
+            - draw indexed instanced:
+                params:
+                    - name: drawParam
+                      type: const draw indexed instanced desc *
+            - present:
+                params:
+                    - name: pSwapChain
+                      type: swap chain *
+
+    - compute command encoder:
+        type: interface
+        inherit: command encoder
+        functions:
+            - dispatch:
+                params:
+                    - name: x
+                      type: uint32_t
+                    - name: y
+                      type: uint32_t
+                    - name: z
+                      type: uint32_t
+
+    - parallel render command encoder:
+        type: interface
+        inherit: command encoder
+        functions:
+          - encoder:
+              return: render command encoder *

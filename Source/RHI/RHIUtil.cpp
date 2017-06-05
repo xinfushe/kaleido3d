@@ -12,9 +12,9 @@ uint64 HashRenderPassDesc(RenderPassDesc const& Desc)
   auto ColorAttachments = Desc.ColorAttachments;
   struct RenderPassAttachDesc
   {
-    EPixelFormat Format;
-    ELoadAction LoadAction;
-    EStoreAction StoreAction;
+    NGFXPixelFormat Format;
+    NGFXLoadAction LoadAction;
+    NGFXStoreAction StoreAction;
     Vec4f ClearColor;
     RenderPassAttachDesc(const ColorAttachmentDesc& Desc)
       : Format(Desc.pTexture->GetDesc().TextureDesc.Format)

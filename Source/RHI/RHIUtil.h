@@ -36,7 +36,7 @@ K3D_COMMON_NS
   // For Vulkan Framebuffer Cache
   uint64 K3D_API HashAttachments(RenderPassDesc const& Desc);
 
-  typedef std::map<k3d::PipelineLayoutKey, k3d::PipelineLayoutRef>
+  typedef std::map<k3d::PipelineLayoutKey, k3d::NGFXPipelineLayoutRef>
     MapPipelineLayout;
 }
 

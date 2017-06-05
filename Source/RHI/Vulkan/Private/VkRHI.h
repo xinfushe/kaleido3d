@@ -82,7 +82,7 @@ struct ResTrait
 };
 
 template<>
-struct ResTrait<k3d::IBuffer>
+struct ResTrait<NGFXBuffer>
 {
   typedef VkBuffer Obj;
   typedef VkBufferView View;
@@ -99,7 +99,7 @@ struct ResTrait<k3d::IBuffer>
 };
 
 template<>
-struct ResTrait<k3d::ITexture>
+struct ResTrait<NGFXTexture>
 {
   typedef VkImage Obj;
   typedef VkImageView View;
@@ -356,7 +356,7 @@ public:
 };
 
 class Device
-  : public k3d::IDevice
+  : public NGFXDevice
   , public k3d::EnableSharedFromThis<Device>
 {
 public:
@@ -366,38 +366,38 @@ public:
   ~Device() override;
   void Release() override;
 
-  k3d::GpuResourceRef CreateResource(k3d::ResourceDesc const&) override;
+  NGFXResourceRef CreateResource(k3d::ResourceDesc const&) override;
 
-  k3d::ShaderResourceViewRef CreateShaderResourceView(
-    k3d::GpuResourceRef,
+  NGFXSRVRef CreateShaderResourceView(
+    NGFXResourceRef,
     k3d::SRVDesc const&) override;
 
-  k3d::UnorderedAccessViewRef CreateUnorderedAccessView(const k3d::GpuResourceRef&,
+  NGFXUAVRef CreateUnorderedAccessView(const NGFXResourceRef&,
     k3d::UAVDesc const&) override;
 
-  k3d::SamplerRef CreateSampler(const k3d::SamplerState&) override;
+  NGFXSamplerRef CreateSampler(const k3d::SamplerState&) override;
 
-  k3d::PipelineLayoutRef CreatePipelineLayout(
+  NGFXPipelineLayoutRef CreatePipelineLayout(
     k3d::PipelineLayoutDesc const& table) override;
 
-  k3d::RenderPassRef CreateRenderPass(k3d::RenderPassDesc const&) override;
+  NGFXRenderpassRef CreateRenderPass(k3d::RenderPassDesc const&) override;
 
-  k3d::PipelineStateRef CreateRenderPipelineState(
+  NGFXPipelineStateRef CreateRenderPipelineState(
     k3d::RenderPipelineStateDesc const&,
-    k3d::PipelineLayoutRef,
-    k3d::RenderPassRef) override;
+    NGFXPipelineLayoutRef,
+    NGFXRenderpassRef) override;
 
-  k3d::PipelineStateRef CreateComputePipelineState(
+  NGFXPipelineStateRef CreateComputePipelineState(
     k3d::ComputePipelineStateDesc const&,
-    k3d::PipelineLayoutRef) override;
+    NGFXPipelineLayoutRef) override;
 
-  k3d::SyncFenceRef CreateFence() override;
+  NGFXFenceRef CreateFence() override;
 
-  k3d::CommandQueueRef CreateCommandQueue(k3d::ECommandType const&) override;
+  NGFXCommandQueueRef CreateCommandQueue(NGFXCommandType const&) override;
 
   void WaitIdle() override { vkDeviceWaitIdle(m_Device); }
 
-  void QueryTextureSubResourceLayout(k3d::TextureRef,
+  void QueryTextureSubResourceLayout(NGFXTextureRef,
                                      k3d::TextureSpec const& spec,
                                      k3d::SubResourceLayout*) override;
 
@@ -416,7 +416,7 @@ public:
   DescriptorSetLayoutRef NewDescriptorSetLayout(BindingArray const& bindings);
 
   uint64 GetMaxAllocationCount();
-  VkShaderModule CreateShaderModule(k3d::ShaderBundle const& Bundle);
+  VkShaderModule CreateShaderModule(NGFXShaderBundle const& Bundle);
   VkQueue GetImmQueue() const { return m_ImmediateQueue; }
   VkCommandBuffer AllocateImmediateCommand();
 
@@ -455,7 +455,7 @@ private:
 
 class Instance
   : public EnableSharedFromThis<Instance>
-  , public k3d::IFactory
+  , public NGFXFactory
 {
 public:
   Instance(const ::k3d::String& engineName,
@@ -464,10 +464,10 @@ public:
   ~Instance();
 
   void Release() override;
-  // IFactory::EnumDevices
-  void EnumDevices(DynArray<k3d::DeviceRef>& Devices) override;
-  // IFactory::CreateSwapChain
-  k3d::SwapChainRef CreateSwapchain(k3d::CommandQueueRef pCommandQueue,
+  // NGFXFactory::EnumDevices
+  void EnumDevices(DynArray<NGFXDeviceRef>& Devices) override;
+  // NGFXFactory::CreateSwapChain
+  NGFXSwapChainRef CreateSwapchain(NGFXCommandQueueRef pCommandQueue,
                                     void* nPtr,
                                     k3d::SwapChainDesc&) override;
 
@@ -635,7 +635,7 @@ public:
  * Fences are signaled by the system when work invoked by vkQueueSubmit
  * completes.
  */
-class Fence : public TVkRHIObjectBase<VkFence, k3d::ISyncFence>
+class Fence : public TVkRHIObjectBase<VkFence, NGFXFence>
 {
 public:
   Fence(Device::Ptr pDevice,
@@ -676,7 +676,7 @@ private:
   friend class CommandContext;
 };
 
-class Sampler : public TVkRHIObjectBase<VkSampler, k3d::ISampler>
+class Sampler : public TVkRHIObjectBase<VkSampler, NGFXSampler>
 {
 public:
   explicit Sampler(Device::Ptr pDevice, k3d::SamplerState const& sampleDesc);
@@ -692,7 +692,7 @@ protected:
  * @param binding
  */
 VkDescriptorSetLayoutBinding
-RHIBinding2VkBinding(k3d::shc::Binding const& binding);
+RHIBinding2VkBinding(NGFXShaderBinding const& binding);
 /**
  * Vulkan has DescriptorPool, DescriptorSet, DescriptorSetLayout and
  * PipelineLayout DescriptorSet is allocated from DescriptorPool with
@@ -752,9 +752,9 @@ private:
 };
 
 class DescriptorSet
-  : public TVkRHIObjectBase<VkDescriptorSet, k3d::IBindingGroup>
+  : public TVkRHIObjectBase<VkDescriptorSet, NGFXBindingGroup>
 {
-  using Super = TVkRHIObjectBase<VkDescriptorSet, k3d::IBindingGroup>;
+  using Super = TVkRHIObjectBase<VkDescriptorSet, NGFXBindingGroup>;
   template<typename T>
   friend class CommandEncoder;
 public:
@@ -763,9 +763,9 @@ public:
                                       BindingArray const& bindings,
                                       Device::Ptr pDevice);
   virtual ~DescriptorSet();
-  void Update(uint32 bindSet, k3d::UnorderedAccessViewRef) override;
-  void Update(uint32 bindSet, k3d::SamplerRef) override;
-  void Update(uint32 bindSet, k3d::GpuResourceRef) override;
+  void Update(uint32 bindSet, NGFXUAVRef) override;
+  void Update(uint32 bindSet, NGFXSamplerRef) override;
+  void Update(uint32 bindSet, NGFXResourceRef) override;
   uint32 GetSlotNum() const override;
 
 private:
@@ -784,14 +784,14 @@ private:
 };
 
 class PipelineLayout
-  : public TVkRHIObjectBase<VkPipelineLayout, k3d::IPipelineLayout>
+  : public TVkRHIObjectBase<VkPipelineLayout, NGFXPipelineLayout>
   , public EnableSharedFromThis<PipelineLayout>
 {
 public:
   PipelineLayout(Device::Ptr pDevice, k3d::PipelineLayoutDesc const& desc);
   ~PipelineLayout() override;
 
-  k3d::BindingGroupRef ObtainBindingGroup() override;
+  NGFXBindingGroupRef ObtainBindingGroup() override;
 
   VkDescriptorPool Pool() const
   {
@@ -904,7 +904,7 @@ protected:
   ResourceUsageFlags m_ResUsageFlags = 0;
   ResourceDescriptorInfo m_ResDescInfo{};
   k3d::ResourceDesc m_ResDesc;
-  k3d::EResourceState m_UsageState = k3d::ERS_Unknown;
+  NGFXResourceState m_UsageState = NGFX_RESOURCE_STATE_UNKNOWN;
   k3d::String m_Name;
   bool m_SelfOwned = true;
 
@@ -929,7 +929,7 @@ protected:
   }
 };
 
-class Buffer : public TResource<k3d::IBuffer>
+class Buffer : public TResource<NGFXBuffer>
 {
 public:
   typedef Buffer* Ptr;
@@ -943,7 +943,7 @@ public:
   void Create(size_t size);
 };
 
-class Texture : public TResource<k3d::ITexture>
+class Texture : public TResource<NGFXTexture>
 {
 public:
   typedef ::k3d::SharedPtr<Texture> TextureRef;
@@ -961,11 +961,11 @@ public:
   
   ~Texture() override;
 
-  void BindSampler(k3d::SamplerRef sampler) override;
-  k3d::SamplerCRef GetSampler() const override;
-  k3d::ShaderResourceViewRef GetResourceView() const override { return m_SRV; }
-  void SetResourceView(k3d::ShaderResourceViewRef srv) override { m_SRV = srv; }
-  k3d::EResourceState GetState() const override { return Super::m_UsageState; }
+  void BindSampler(NGFXSamplerRef sampler) override;
+  NGFXSamplerRef GetSampler() const override;
+  NGFXSRVRef GetResourceView() const override { return m_SRV; }
+  void SetResourceView(NGFXSRVRef srv) override { m_SRV = srv; }
+  NGFXResourceState GetState() const override { return Super::m_UsageState; }
   
   VkImageLayout GetImageLayout() const { return m_ImageLayout; }
   VkImageSubresourceRange GetSubResourceRange() const { return m_SubResRange; }
@@ -983,7 +983,7 @@ private:
 private:
   ::k3d::SharedPtr<Sampler> m_ImageSampler;
   VkImageViewCreateInfo m_ImageViewInfo = {};
-  k3d::ShaderResourceViewRef m_SRV;
+  NGFXSRVRef m_SRV;
   VkImageCreateInfo m_ImageInfo = {};
   VkImageLayout m_ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   VkImageMemoryBarrier m_Barrier;
@@ -1099,7 +1099,7 @@ private:
  */
 class RenderTarget
   : public DeviceChild
-  , public k3d::IRenderTarget
+  , public NGFXRenderTarget
 {
 public:
   RenderTarget(Device::Ptr pDevice,
@@ -1114,7 +1114,7 @@ public:
   VkRenderPass GetRenderpass() const;
   Texture::TextureRef GetTexture() const;
   VkRect2D GetRenderArea() const;
-  k3d::GpuResourceRef GetBackBuffer() override;
+  NGFXResourceRef GetBackBuffer() override;
   PtrSemaphore GetSemaphore() { return m_AcquireSemaphore; }
 
   void SetClearColor(kMath::Vec4f clrColor) override
@@ -1140,19 +1140,19 @@ private:
 };
 
 class CommandQueue
-  : public TVkRHIObjectBase<VkQueue, k3d::ICommandQueue>
+  : public TVkRHIObjectBase<VkQueue, NGFXCommandQueue>
   , public EnableSharedFromThis<CommandQueue>
 {
 public:
-  using This = TVkRHIObjectBase<VkQueue, k3d::ICommandQueue>;
+  using This = TVkRHIObjectBase<VkQueue, NGFXCommandQueue>;
   CommandQueue(Device::Ptr pDevice,
                VkQueueFlags queueTypes,
                uint32 queueFamilyIndex,
                uint32 queueIndex);
   virtual ~CommandQueue();
 
-  k3d::CommandBufferRef ObtainCommandBuffer(
-    k3d::ECommandUsageType const&) override;
+  NGFXCommandBufferRef ObtainCommandBuffer(
+    NGFXCommandReuseType const&) override;
 
   void Submit(const std::vector<VkCommandBuffer>& cmdBufs,
               const std::vector<VkSemaphore>& waitSemaphores,
@@ -1185,30 +1185,30 @@ private:
 };
 
 class CommandBuffer
-  : public TVkRHIObjectBase<VkCommandBuffer, k3d::ICommandBuffer>
+  : public TVkRHIObjectBase<VkCommandBuffer, NGFXCommandBuffer>
   , public EnableSharedFromThis<CommandBuffer>
 {
 public:
-  using This = TVkRHIObjectBase<VkCommandBuffer, k3d::ICommandBuffer>;
+  using This = TVkRHIObjectBase<VkCommandBuffer, NGFXCommandBuffer>;
 
   void Release() override;
 
-  void Commit(SyncFenceRef pFence) override;
-  void Present(k3d::SwapChainRef pSwapChain, k3d::SyncFenceRef pFence) override;
+  void Commit(NGFXFenceRef pFence) override;
+  void Present(NGFXSwapChainRef pSwapChain, NGFXFenceRef pFence) override;
 
   void Reset() override;
-  k3d::RenderCommandEncoderRef RenderCommandEncoder(
+  NGFXRenderCommandEncoderRef RenderCommandEncoder(
     RenderPassDesc const&) override;
-  k3d::ComputeCommandEncoderRef ComputeCommandEncoder() override;
-  k3d::ParallelRenderCommandEncoderRef ParallelRenderCommandEncoder(
+  NGFXComputeCommandEncoderRef ComputeCommandEncoder() override;
+  NGFXParallelRenderCommandEncoderRef ParallelRenderCommandEncoder(
     RenderPassDesc const&) override;
   void CopyTexture(const k3d::TextureCopyLocation& Dest,
                    const k3d::TextureCopyLocation& Src) override;
-  void CopyBuffer(k3d::GpuResourceRef Dest,
-                  k3d::GpuResourceRef Src,
+  void CopyBuffer(NGFXResourceRef Dest,
+                  NGFXResourceRef Src,
                   k3d::CopyBufferRegion const& Region) override;
-  void Transition(k3d::GpuResourceRef pResource,
-                  k3d::EResourceState const&
+  void Transition(NGFXResourceRef pResource,
+                  NGFXResourceState const&
                     State /*, k3d::EPipelineStage const& Stage*/) override;
 
   SpCmdQueue OwningQueue() { return m_OwningQueue; }
@@ -1225,7 +1225,7 @@ protected:
 
   bool m_Ended;
   SpCmdQueue m_OwningQueue;
-  k3d::SwapChainRef m_PendingSwapChain;
+  NGFXSwapChainRef m_PendingSwapChain;
 };
 
 template<typename CmdEncoderSubT>
@@ -1239,10 +1239,10 @@ public:
   }
 
   void SetPipelineState(uint32 HashCode,
-                        k3d::PipelineStateRef const& pPipeline) override
+                        NGFXPipelineStateRef const& pPipeline) override
   {
     K3D_ASSERT(pPipeline);
-    if (pPipeline->GetType() == k3d::EPSO_Compute) {
+    if (pPipeline->GetType() == NGFX_PIPELINE_Compute) {
       ComputePipelineState* computePso =
         static_cast<ComputePipelineState*>(pPipeline.Get());
       vkCmdBindPipeline(m_MasterCmd->NativeHandle(),
@@ -1257,7 +1257,7 @@ public:
     }
   }
 
-  void SetBindingGroup(BindingGroupRef const& pBindingGroup) override
+  void SetBindingGroup(NGFXBindingGroupRef const& pBindingGroup) override
   {
     K3D_ASSERT(pBindingGroup);
     auto pDescSet = StaticPointerCast<DescriptorSet>(pBindingGroup);
@@ -1293,16 +1293,16 @@ enum class ECmdLevel : uint8
 
 class ParallelCommandEncoder;
 using SpParallelCmdEncoder = SharedPtr<ParallelCommandEncoder>;
-class RenderCommandEncoder : public CommandEncoder<k3d::IRenderCommandEncoder>
+class RenderCommandEncoder : public CommandEncoder<NGFXRenderCommandEncoder>
 {
 public:
-  using This = CommandEncoder<k3d::IRenderCommandEncoder>;
+  using This = CommandEncoder<NGFXRenderCommandEncoder>;
   void SetScissorRect(const k3d::Rect&) override;
   void SetViewport(const k3d::ViewportDesc&) override;
   void SetIndexBuffer(const k3d::IndexBufferView& IBView) override;
   void SetVertexBuffer(uint32 Slot,
                        const k3d::VertexBufferView& VBView) override;
-  void SetPrimitiveType(k3d::EPrimitiveType) override;
+  void SetPrimitiveType(NGFXPrimitiveType) override;
   void DrawInstanced(k3d::DrawInstancedParam) override;
   void DrawIndexedInstanced(k3d::DrawIndexedInstancedParam) override;
   void EndEncode() override;
@@ -1323,9 +1323,9 @@ private:
   ECmdLevel m_Level;
 };
 using SpRenderCommandEncoder = SharedPtr<RenderCommandEncoder>;
-class ComputeCommandEncoder : public CommandEncoder<k3d::IComputeCommandEncoder>
+class ComputeCommandEncoder : public CommandEncoder<NGFXComputeCommandEncoder>
 {
-  using Super = CommandEncoder<k3d::IComputeCommandEncoder>;
+  using Super = CommandEncoder<NGFXComputeCommandEncoder>;
 public:
   void Dispatch(uint32 GroupCountX,
                 uint32 GroupCountY,
@@ -1342,12 +1342,12 @@ private:
 };
 
 class ParallelCommandEncoder
-  : public CommandEncoder<k3d::IParallelRenderCommandEncoder>
+  : public CommandEncoder<NGFXParallelRenderCommandEncoder>
   , public EnableSharedFromThis<ParallelCommandEncoder>
 {
 public:
-  using Super = CommandEncoder<k3d::IParallelRenderCommandEncoder>;
-  k3d::RenderCommandEncoderRef SubRenderCommandEncoder() override;
+  using Super = CommandEncoder<NGFXParallelRenderCommandEncoder>;
+  NGFXRenderCommandEncoderRef SubRenderCommandEncoder() override;
   void EndEncode() override;
   VkPipelineBindPoint GetBindPoint() const override
   {
@@ -1363,26 +1363,26 @@ private:
   DynArray<SpRenderCommandEncoder> m_RecordedCmds;
 };
 
-class SwapChain : public TVkRHIObjectBase<VkSwapchainKHR, k3d::ISwapChain>
+class SwapChain : public TVkRHIObjectBase<VkSwapchainKHR, NGFXSwapChain>
 {
   friend class CommandQueue;
   friend class CommandBuffer;
 public:
-  using Super = TVkRHIObjectBase<VkSwapchainKHR, k3d::ISwapChain>;
+  using Super = TVkRHIObjectBase<VkSwapchainKHR, NGFXSwapChain>;
 
   SwapChain(Device::Ptr pDevice, void* pWindow, k3d::SwapChainDesc& Desc);
   ~SwapChain();
 
-  // ISwapChain::Release
+  // NGFXSwapChain::Release
   void Release() override;
-  // ISwapChain::Resize
+  // NGFXSwapChain::Resize
   void Resize(uint32 Width, uint32 Height) override;
-  // ISwapChain::GetCurrentTexture
-  k3d::TextureRef GetCurrentTexture() override;
+  // NGFXSwapChain::GetCurrentTexture
+  NGFXTextureRef GetCurrentTexture() override;
 
   void Present() override;
 
-  void QueuePresent(SpCmdQueue pQueue, k3d::SyncFenceRef pFence);
+  void QueuePresent(SpCmdQueue pQueue, NGFXFenceRef pFence);
 
   void AcquireNextImage();
 
@@ -1416,7 +1416,7 @@ private:
 
   VkSwapchainCreateInfoKHR m_CachedCreateInfo;
 
-  DynArray<k3d::TextureRef> m_Buffers;
+  DynArray<NGFXTextureRef> m_Buffers;
   DynArray<VkImage> m_ColorImages;
 };
 
@@ -1446,10 +1446,10 @@ private:
 
 using PtrFrameBuffer = std::shared_ptr<FrameBuffer>;
 
-class RenderPass : public TVkRHIObjectBase<VkRenderPass, k3d::IRenderPass>
+class RenderPass : public TVkRHIObjectBase<VkRenderPass, NGFXRenderpass>
 {
 public:
-  using Super = TVkRHIObjectBase<VkRenderPass, k3d::IRenderPass>;
+  using Super = TVkRHIObjectBase<VkRenderPass, NGFXRenderpass>;
 
   RenderPass(Device::Ptr pDevice, k3d::RenderPassDesc const&);
 
@@ -1497,7 +1497,7 @@ public:
 
 protected:
   VkPipelineShaderStageCreateInfo ConvertStageInfoFromShaderBundle(
-    k3d::ShaderBundle const& Bundle)
+    NGFXShaderBundle const& Bundle)
   {
     return { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
              nullptr,
@@ -1513,13 +1513,13 @@ protected:
   VkPipelineCache m_PipelineCache;
 };
 
-class RenderPipelineState : public TPipelineState<k3d::IRenderPipelineState>
+class RenderPipelineState : public TPipelineState<NGFXRenderPipelineState>
 {
 public:
   RenderPipelineState(Device::Ptr pDevice,
                       k3d::RenderPipelineStateDesc const& desc,
-                      k3d::PipelineLayoutRef ppl,
-                      k3d::RenderPassRef pRenderPass);
+                      NGFXPipelineLayoutRef ppl,
+                      NGFXRenderpassRef pRenderPass);
   virtual ~RenderPipelineState();
 
   void BindRenderPass(VkRenderPass RenderPass);
@@ -1527,9 +1527,8 @@ public:
   void SetRasterizerState(const k3d::RasterizerState&) override;
   void SetBlendState(const k3d::BlendState&) override;
   void SetDepthStencilState(const k3d::DepthStencilState&) override;
-  void SetSampler(k3d::SamplerRef) override;
-  void SetPrimitiveTopology(const k3d::EPrimitiveType) override;
-  void SetRenderTargetFormat(const k3d::RenderTargetFormat&) override;
+  void SetSampler(NGFXSamplerRef) override;
+  void SetPrimitiveTopology(const NGFXPrimitiveType) override;
 
   VkPipeline GetPipeline() const { return m_Pipeline; }
   void Rebuild() override;
@@ -1537,9 +1536,9 @@ public:
   /**
    * TOFIX
    */
-  k3d::EPipelineType GetType() const override
+  NGFXPipelineType GetType() const override
   {
-    return k3d::EPipelineType::EPSO_Graphics;
+    return NGFXPipelineType::NGFX_PIPELINE_GRAPHICS;
   }
 
 protected:
@@ -1562,11 +1561,11 @@ private:
   VkPipelineVertexInputStateCreateInfo m_VertexInputState;
   std::vector<VkVertexInputBindingDescription> m_BindingDescriptions;
   std::vector<VkVertexInputAttributeDescription> m_AttributeDescriptions;
-  WeakPtr<k3d::IRenderPass> m_WeakRenderPassRef;
-  WeakPtr<k3d::IPipelineLayout> m_weakPipelineLayoutRef;
+  WeakPtr<NGFXRenderpass> m_WeakRenderPassRef;
+  WeakPtr<NGFXPipelineLayout> m_weakPipelineLayoutRef;
 };
 
-class ComputePipelineState : public TPipelineState<k3d::IComputePipelineState>
+class ComputePipelineState : public TPipelineState<NGFXComputePipelineState>
 {
 public:
   ComputePipelineState(Device::Ptr pDevice,
@@ -1575,9 +1574,9 @@ public:
 
   ~ComputePipelineState() override {}
 
-  k3d::EPipelineType GetType() const override
+  NGFXPipelineType GetType() const override
   {
-    return k3d::EPipelineType::EPSO_Compute;
+    return NGFXPipelineType::NGFX_PIPELINE_Compute;
   }
   void Rebuild() override;
 
@@ -1589,30 +1588,30 @@ private:
 };
 
 class ShaderResourceView
-  : public TVkRHIObjectBase<VkImageView, k3d::IShaderResourceView>
+  : public TVkRHIObjectBase<VkImageView, NGFXShaderResourceView>
 {
 public:
   ShaderResourceView(Device::Ptr pDevice,
                      k3d::SRVDesc const& desc,
-                     k3d::GpuResourceRef gpuResource);
+                     NGFXResourceRef gpuResource);
   ~ShaderResourceView() override;
-  k3d::GpuResourceRef GetResource() const override
+  NGFXResourceRef GetResource() const override
   {
-    return k3d::GpuResourceRef(m_WeakResource);
+    return NGFXResourceRef(m_WeakResource);
   }
   k3d::SRVDesc GetDesc() const override { return m_Desc; }
   VkImageView NativeImageView() const { return m_NativeObj; }
 
 private:
-  WeakPtr<k3d::IGpuResource> m_WeakResource;
+  WeakPtr<NGFXResource> m_WeakResource;
   k3d::SRVDesc m_Desc;
   VkImageViewCreateInfo m_TextureViewInfo;
 };
 
-class UnorderedAceessView : public k3d::IUnorderedAccessView
+class UnorderedAceessView : public NGFXUnorderedAccessView
 {
 public:
-  UnorderedAceessView(Device::Ptr pDevice, k3d::UAVDesc const& Desc, const k3d::GpuResourceRef& pResource);
+  UnorderedAceessView(Device::Ptr pDevice, k3d::UAVDesc const& Desc, const NGFXResourceRef& pResource);
   ~UnorderedAceessView() override;
   friend class DescriptorSet;
 private:
